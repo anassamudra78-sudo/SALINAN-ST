@@ -1409,9 +1409,8 @@ else if (tabId === 'pengaturan') renderPengaturan(container);
             jurnal: { title: 'Jurnal Harian', fields: [{id:'tanggal', label:'Tanggal', type:'date'}, {id:'kelasId', label:'Kelas', type:'dynamicSelect', source:'kelas', displayField:'kode'}, {id:'mapelId', label:'Mapel', type:'dynamicSelect', source:'mapel', displayField:'nama'}, {id:'materi', label:'Materi Pokok'}] }
         };
 
-       function renderCRUD(container, type) {
+      function renderCRUD(container, type) {
             const config = crudConfig[type];
-            // --- KUNCI PERBAIKAN: FILTER KELAS KHUSUS SISWA ---
             let data = AppState.db[type] || [];
             let filterDropdownHtml = '';
 
@@ -1426,17 +1425,12 @@ else if (tabId === 'pengaturan') renderPengaturan(container);
                     </select>
                 `;
                 
-                // Saring data siswa jika ada kelas yang dipilih
                 if (currentFilter) {
                     data = data.filter(item => item.kelasId === currentFilter);
                 }
             }
             
-            const dataAsliUtuh = AppState.db[type] || []; // Dicadangkan agar fungsi edit tidak error
-            // --------------------------------------------------
-            
-            // ---------------------------------------------------------
-            // PONDASI BAJA (OPTIMASI PERFORMA): Membuat Kamus Data (Hash Map)
+            const dataAsliUtuh = AppState.db[type] || []; 
             const kamusRelasi = {};
             config.fields.forEach(f => {
                 if (f.type === 'dynamicSelect') {
@@ -1447,21 +1441,16 @@ else if (tabId === 'pengaturan') renderPengaturan(container);
                 }
             });
 
-            // PEMBUATAN TABEL DATA
             let tableRows = data.length === 0 
                 ? `<tr><td colspan="${config.fields.length+3}" class="text-center py-12 text-slate-400 font-medium text-sm">Belum ada data ${config.title}.</td></tr>`
                 : data.map((item, idx) => {
                     let tdFields = config.fields.map(f => {
                         let val = item[f.id] || '-';
                         if(f.type === 'dynamicSelect') {
-                            // Menggunakan Kamus Relasi agar tabel secepat kilat (anti-lag)
                             const ref = kamusRelasi[f.source] ? kamusRelasi[f.source][item[f.id]] : null;
                             val = ref ? ref[f.displayField] : (item[f.id] || '<span class="text-rose-400 font-semibold italic">Belum diatur</span>');
                         }
-                        
-                        // KEAMANAN (XSS): Menjinakkan kode jahat dari Excel
                         let amanVal = String(val).includes('<span class="text-rose-400') ? val : escapeHTML(val);
-                        
                         return `<td class="py-4 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 max-w-[180px] truncate">${amanVal}</td>`;
                     }).join('');
                     
@@ -1477,7 +1466,7 @@ else if (tabId === 'pengaturan') renderPengaturan(container);
                         </td>
                     </tr>`;
                 }).join('');
-            // ---------------------------------------------------------
+            
             const editingItem = AppState.ui.editingId ? dataAsliUtuh.find(i => i.id === AppState.ui.editingId) : null;
 
             let formFields = config.fields.map(f => {
@@ -1498,55 +1487,43 @@ else if (tabId === 'pengaturan') renderPengaturan(container);
             }).join('');
 
             container.innerHTML = `
-                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-                    <div class="xl:col-span-4 bg-white dark:bg-slate-900 rounded-[2rem] shadow-md border border-slate-100 dark:border-slate-800 p-6 sm:p-8 h-full flex flex-col justify-between">
+                <div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
+                    <div class="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-[2rem] shadow-md border border-slate-100 dark:border-slate-800 p-6 sm:p-8 h-fit shrink-0 lg:sticky lg:top-4 z-20 max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <h4 class="font-black text-lg text-slate-800 dark:text-white mb-6 border-b dark:border-slate-800 pb-4">
-                            ${editingItem ? `<i class="fa-solid fa-pen-to-square text-amber-500 mr-2"></i>Edit ${config.title}` : `<i class="fa-solid fa-plus-circle text-brand-500 mr-2"></i>Tambah ${config.title}`}
+                            ${editingItem ? \`<i class="fa-solid fa-pen-to-square text-amber-500 mr-2"></i>Edit \${config.title}\` : \`<i class="fa-solid fa-plus-circle text-brand-500 mr-2"></i>Tambah \${config.title}\`}
                         </h4>
-                        <div class="space-y-5" id="crud-form">${formFields}</div>
+                        <div class="space-y-5" id="crud-form">\${formFields}</div>
                         <div class="flex space-x-3 mt-8">
-                            ${editingItem ? `<button onclick="batalEdit('${type}')" class="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-all shadow-sm">Batal</button>` : ''}
-                            <button onclick="saveCRUD('${type}')" class="flex-1 ${editingItem ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-brand-600 hover:bg-brand-500 shadow-brand-500/30'} text-white font-black py-3.5 rounded-xl shadow-lg transition-transform active:scale-95">
-                                ${editingItem ? 'Simpan Edit' : 'Simpan Data'}
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="xl:col-span-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-md border border-slate-100 dark:border-slate-800 overflow-hidden">
-                        <h4 class="font-black text-lg text-slate-800 dark:text-white mb-6 border-b dark:border-slate-800 pb-4">
-                            ${editingItem ? `<i class="fa-solid fa-pen-to-square text-amber-500 mr-2"></i>Edit ${config.title}` : `<i class="fa-solid fa-plus-circle text-brand-500 mr-2"></i>Tambah ${config.title}`}
-                        </h4>
-                        <div class="space-y-5" id="crud-form">${formFields}</div>
-                        <div class="flex space-x-3 mt-8">
-                            ${editingItem ? `<button onclick="batalEdit('${type}')" class="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-all shadow-sm">Batal</button>` : ''}
-                            <button onclick="saveCRUD('${type}')" class="flex-1 ${editingItem ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-brand-600 hover:bg-brand-500 shadow-brand-500/30'} text-white font-black py-3.5 rounded-xl shadow-lg transition-transform active:scale-95">
-                                ${editingItem ? 'Simpan Edit' : 'Simpan Data'}
+                            \${editingItem ? \`<button onclick="batalEdit('\${type}')" class="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-all shadow-sm">Batal</button>\` : ''}
+                            <button onclick="saveCRUD('\${type}')" class="flex-1 \${editingItem ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-brand-600 hover:bg-brand-500 shadow-brand-500/30'} text-white font-black py-3.5 rounded-xl shadow-lg transition-transform active:scale-95">
+                                \${editingItem ? 'Simpan Edit' : 'Simpan Data'}
                             </button>
                         </div>
                     </div>
                     
                     <div class="w-full lg:w-2/3 bg-white dark:bg-slate-900 rounded-[2rem] shadow-md border border-slate-100 dark:border-slate-800 overflow-hidden">
                         <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 gap-4">
-                            <h4 class="font-black text-lg text-slate-800 dark:text-white"><i class="fa-solid fa-table-list mr-2 text-indigo-500"></i>Daftar ${config.title}</h4>
+                            <h4 class="font-black text-lg text-slate-800 dark:text-white"><i class="fa-solid fa-table-list mr-2 text-indigo-500"></i>Daftar \${config.title}</h4>
                             <div class="flex flex-wrap gap-2 w-full xl:w-auto">
-                                ${filterDropdownHtml}
-                                <button id="btn-batch-delete-${type}" onclick="deleteBatchCRUD('${type}')" class="hidden bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm shadow-md transition-all flex items-center shrink-0">
-                                    <i class="fa-solid fa-trash-can mr-2"></i> Hapus (<span id="batch-count-${type}">0</span>)
+                                \${filterDropdownHtml}
+                                <button id="btn-batch-delete-\${type}" onclick="deleteBatchCRUD('\${type}')" class="hidden bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm shadow-md transition-all flex items-center shrink-0">
+                                    <i class="fa-solid fa-trash-can mr-2"></i> Hapus (<span id="batch-count-\${type}">0</span>)
                                 </button>
-                               <button onclick="exportExcel('${type}')" class="flex-1 sm:flex-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-300 font-bold py-2.5 px-4 rounded-xl text-sm shadow-sm transition-all"><i class="fa-solid fa-file-excel mr-1.5 text-emerald-500"></i> Ekspor Excel</button>
-                                <button onclick="openImportModal('${type}')" class="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm shadow-md shadow-purple-500/30 transition-all"><i class="fa-solid fa-file-excel mr-1.5"></i> Impor Excel</button>
+                               <button onclick="exportExcel('\${type}')" class="flex-1 sm:flex-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-300 font-bold py-2.5 px-4 rounded-xl text-sm shadow-sm transition-all"><i class="fa-solid fa-file-excel mr-1.5 text-emerald-500"></i> Ekspor Excel</button>
+                                <button onclick="openImportModal('\${type}')" class="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm shadow-md shadow-purple-500/30 transition-all"><i class="fa-solid fa-file-excel mr-1.5"></i> Impor Excel</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto p-2 custom-scrollbar max-h-[75vh] overflow-y-auto relative">
-    <table class="w-full text-left border-collapse min-w-max">
-        <thead class="bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-extrabold sticky top-0 z-10 shadow-sm">
-            <tr class="bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-extrabold">                                        <th class="py-4 px-4 w-12 text-center rounded-l-xl"><input type="checkbox" id="select-all-${type}" onchange="toggleSelectAllCRUD('${type}', this.checked)" class="w-4 h-4 accent-brand-600 rounded cursor-pointer" title="Pilih Semua"></th>
+                            <table class="w-full text-left border-collapse min-w-max">
+                                <thead class="bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-extrabold sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th class="py-4 px-4 w-12 text-center rounded-l-xl"><input type="checkbox" id="select-all-\${type}" onchange="toggleSelectAllCRUD('\${type}', this.checked)" class="w-4 h-4 accent-brand-600 rounded cursor-pointer" title="Pilih Semua"></th>
                                         <th class="py-4 px-4 w-14 text-center">No</th>
-                                        ${config.fields.map(f => `<th class="py-4 px-4">${f.label}</th>`).join('')}
+                                        \${config.fields.map(f => \`<th class="py-4 px-4">\${f.label}</th>\`).join('')}
                                         <th class="py-4 px-4 text-right rounded-r-xl">Aksi Opsi</th>
                                     </tr>
                                 </thead>
-                                <tbody>${tableRows}</tbody>
+                                <tbody>\${tableRows}</tbody>
                             </table>
                         </div>
                     </div>
