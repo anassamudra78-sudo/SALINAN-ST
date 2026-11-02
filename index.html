@@ -5824,24 +5824,42 @@ renderLabelWorkspace();
 
 // 3. Logika Buka Tutup Pop-up (Modal)
 function bukaModalWorkspace() {
-    const modal = document.getElementById('modal-workspace');c
+    const modal = document.getElementById('modal-workspace');
     const content = document.getElementById('modal-workspace-content');
+    if (!modal) return;
+    
     modal.classList.remove('hidden');
-    // Efek animasi halus
+    modal.style.display = 'flex';
+    
+    // Pastikan daftar ruang kerja dirender terlebih dahulu
+    renderListWorkspace();
+    
     setTimeout(() => {
         modal.classList.remove('opacity-0');
-        content.classList.remove('scale-95');
-    }, 10);
-    renderListWorkspace();
+        if (content) {
+            content.classList.remove('scale-95');
+            content.classList.add('scale-100');
+        }
+    }, 20);
 }
 
 function tutupModalWorkspace() {
     const modal = document.getElementById('modal-workspace');
     const content = document.getElementById('modal-workspace-content');
+    if (!modal) return;
+    
     modal.classList.add('opacity-0');
-    content.classList.add('scale-95');
-    setTimeout(() => modal.classList.add('hidden'), 300);
-    document.getElementById('form-tambah-ws').classList.add('hidden');
+    if (content) {
+        content.classList.remove('scale-100');
+        content.classList.add('scale-95');
+    }
+    
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        const formTambah = document.getElementById('form-tambah-ws');
+        if (formTambah) formTambah.classList.add('hidden');
+    }, 250);
 }
 
 // Variabel global penanda mode edit
