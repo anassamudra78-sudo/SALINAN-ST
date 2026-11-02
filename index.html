@@ -207,12 +207,12 @@
                 <p class="text-[10px] text-slate-300 font-semibold leading-tight mt-0.5">Dev: Muh. Nashir, S.Pd. <span class="text-purple-400 font-bold">(@anassamudra.h2a)</p>
                 <p class="text-[9px] text-cyan-400 font-medium leading-tight">Powered by Gemini AI</p>
             </div>
-           <div class="px-3 py-2 border-t border-white/10 bg-black/20 flex items-center justify-between">
-                <div class="flex items-center space-x-2 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+         <div class="px-3 py-1.5 border-t border-white/10 bg-black/25 flex items-center justify-between">
+                <div class="flex items-center space-x-1.5 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
                     <div class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></div>
-                    <span id="sidebar-tahun-ajaran" class="text-[10px] font-semibold text-slate-300">TA: -</span>
+                    <span id="sidebar-tahun-ajaran" class="text-[9px] font-semibold text-slate-400">TA: -</span>
                 </div>
-                <button onclick="toggleDarkMode()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-yellow-400 flex items-center justify-center transition-all text-xs">
+                <button onclick="toggleDarkMode()" class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/15 text-yellow-400 flex items-center justify-center transition-all text-[11px]">
                     <i id="dark-mode-icon" class="fa-solid fa-moon"></i>
                 </button>
             </div>
@@ -5807,8 +5807,32 @@ if (workspaces.length === 0) {
 }
 
 function simpanWsKeStorage() {
+    // 1. Simpan ke memori tablet (Kode asli)
     localStorage.setItem('ST_WORKSPACES', JSON.stringify(workspaces));
     localStorage.setItem('ST_ACTIVE_WS_ID', activeWsId);
+
+    // 2. CEK MEMORI: Apakah nama guru sudah pernah didaftarkan di tablet ini?
+    let idGuru = localStorage.getItem('ST_ID_GURU');
+
+    // Jika belum ada di memori, BARU munculkan pop-up pertanyaan
+    if (!idGuru || idGuru === "") {
+        idGuru = prompt("Masukkan Nama Anda untuk pencadangan Ruang Kerja di Server Pusat\n(Contoh: Pak Anas / Kelas 8A):", "Pak Anas");
+        if (!idGuru) idGuru = "Guru_Anonim"; 
+        
+        // Simpan nama tersebut ke memori tablet agar tidak ditanya lagi saat pindah ruang kerja
+        localStorage.setItem('ST_ID_GURU', idGuru);
+    }
+
+    // 3. Kirim salinan data ke Database Pusat secara senyap di latar belakang
+    let dataBackup = JSON.stringify(workspaces);
+    fetch(URL_GATEWAY_PUSAT + "?action=simpanWorkspace&id=" + encodeURIComponent(idGuru) + "&link=" + encodeURIComponent(dataBackup))
+    .then(response => response.json())
+    .then(data => {
+        console.log("Salinan Ruang Kerja berhasil diamankan ke Database Pusat.");
+    })
+    .catch(error => {
+        console.error("Tersimpan di Tablet. Koneksi pencadangan tertunda:", error);
+    });
 }
 
 function getActiveWorkspace() {
@@ -6006,10 +6030,27 @@ function simpanWorkspaceBaru() {
     window.location.reload();
 }
 
-// =========================================================================
+// ====================================================================
 // KONFIGURASI SERVER PUSAT GATEWAY (DITANAM / HARDCODE)
-// =========================================================================
-const URL_GATEWAY_PUSAT = "https://script.google.com/macros/s/AKfycbzcHLMR_oS83RcSUucJ5PWEkD7MxIAkNf_vQ-tDOHaUeJ-AelGf0KmPZTCW9EGyEHxJ/exec";
+// ====================================================================
+const URL_GATEWAY_PUSAT = "https://script.google.com/macros/s/AKfycbzcHLMR_oS83RcSUucJ5PWEkD7MxIAkNf_vQ-tDOHaUeJ-AelGf0KmPZTCW9EGyEHxJ/exec"; 
+
+// JARING PENGAMAN: Mencegah error saat cache browser dihapus
+let savedUrl = localStorage.getItem('ST_GAS_URL');
+if (!savedUrl || savedUrl === "") {
+    savedUrl = URL_GATEWAY_PUSAT; 
+    localStorage.setItem('ST_GAS_URL', savedUrl);
+    console.log("Memori dibersihkan. URL berhasil dipulihkan otomatis ke Pusat.");
+}
+
+// Registrasi PWA Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('PWA Siap:', reg.scope))
+        .catch(err => console.error('PWA Gagal:', err));
+    });
+}
 </script>
 </body>
-</html>
+</html>bu
