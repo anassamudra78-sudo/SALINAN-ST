@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html lang="id">
+    <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+        const container = document.getElementById('main-content');
+        if(container) {
+            container.innerHTML = '<div style="padding:30px; color:#ef4444; font-family:monospace; font-size:13px; background:white; margin:20px; border-radius:15px; border:2px solid #ef4444; position:relative; z-index:999999; box-shadow: 0 10px 25px rgba(0,0,0,0.2);"><b>🚨 RADAR MENDETEKSI ERROR:</b><br><br><b>Pesan:</b> ' + message + '<br><br><b>File:</b> ' + source + '<br><b>Baris Kode:</b> ' + lineno + '</div>';
+        } else {
+            alert("SISTEM ERROR:\n" + message + "\nDi File: " + source + "\nBaris: " + lineno);
+        }
+    };
+    </script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
