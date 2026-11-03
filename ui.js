@@ -1,7 +1,64 @@
 // ==========================================================
 // BAGIAN 1: NAVIGASI, UI DASAR, DASHBOARD & MASTER DATA (CRUD)
 // ==========================================================
+const menuGroups = [
+    {
+        group: 'Operasional Harian',
+        items: [
+            { id: 'dashboard', title: 'Dashboard Utama', icon: 'fa-chart-pie', sub: 'Ringkasan & Jadwal Hari Ini' },
+            { id: 'jadwal', title: 'Jadwal Mengajar', icon: 'fa-calendar-days', sub: 'Pengaturan Jam Mengajar' },
+            { id: 'absensi', title: 'Daftar Hadir', icon: 'fa-clipboard-user', sub: 'Presensi Harian' },
+            { id: 'jurnal', title: 'Jurnal Mengajar', icon: 'fa-book-open-reader', sub: 'Catatan KBM' }
+        ]
+    },
+    {
+        group: 'Data Akademik',
+        items: [
+            { id: 'sekolah', title: 'Data Sekolah', icon: 'fa-school', sub: 'Identitas Institusi' },
+            { id: 'guru', title: 'Data Guru', icon: 'fa-chalkboard-user', sub: 'Kepegawaian' },
+            { id: 'kelas', title: 'Data Kelas', icon: 'fa-door-open', sub: 'Rombongan Belajar' },
+            { id: 'siswa', title: 'Data Siswa', icon: 'fa-users', sub: 'Peserta Didik' },
+            { id: 'mapel', title: 'Mata Pelajaran', icon: 'fa-book', sub: 'Kurikulum' }
+        ]
+    },
+    {
+        group: 'Evaluasi & Dokumen',
+        items: [
+            { id: 'penilaian', title: 'Input Nilai', icon: 'fa-pen-to-square', sub: 'Asesmen Akademik' },
+            { id: 'rekap_nilai', title: 'Rekap Nilai', icon: 'fa-table-cells', sub: 'Legger Nilai' },
+            { id: 'rapor', title: 'Cetak Rapor', icon: 'fa-file-pdf', sub: 'Dokumen Laporan' }
+        ]
+    },
+    {
+        group: 'Smart Studio & Sistem',
+        items: [
+            { id: 'kuis', title: 'Kuis & Bank Soal', icon: 'fa-gamepad', sub: 'Game Show, Podium & Duel' },
+            { id: 'ai', title: 'Asisten AI Guru', icon: 'fa-robot', sub: 'Generator Soal, Kuis & ATP' },
+            { id: 'presentation_studio', title: 'Presentation Studio', icon: 'fa-person-chalkboard', sub: 'Generator Prompt Presentasi' },
+            { id: 'pengaturan', title: 'Pengaturan & Backup', icon: 'fa-gear', sub: 'Sistem & Database' }
+        ]
+    }
+];
+const menuItems = menuGroups.flatMap(g => g.items);
 
+const crudConfig = {
+    jadwal: { title: 'Jadwal Mengajar', fields: [{id:'hari', label:'Hari', type:'select', opts:['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu']}, {id:'tanggal', label:'Tanggal Khusus (Opsional)', type:'date'}, {id:'jamMulai', label:'Jam Mulai', type:'time'}, {id:'jamSelesai', label:'Jam Selesai', type:'time'}, {id:'kelasId', label:'Kelas', type:'dynamicSelect', source:'kelas', displayField:'kode'}, {id:'mapelId', label:'Mata Pelajaran', type:'dynamicSelect', source:'mapel', displayField:'nama'}, {id:'catatan', label:'Catatan / Ruangan'}] },
+    guru: { title: 'Guru', fields: [{id:'nip', label:'NIP/NUPTK'}, {id:'nama', label:'Nama Lengkap'}, {id:'mapel', label:'Guru Mapel'}] },
+    kelas: { title: 'Kelas', fields: [{id:'kode', label:'Kode Kelas (ex: X-A)'}, {id:'tingkat', label:'Tingkat (ex: 10)'}, {id:'wali', label:'Wali Kelas'}] },
+    siswa: { title: 'Siswa', fields: [{id:'nis', label:'NIS'}, {id:'nama', label:'Nama Lengkap'}, {id:'jk', label:'L/P', type:'select', opts:['L','P']}, {id:'kelasId', label:'Kelas (Kode)', type:'dynamicSelect', source:'kelas', displayField:'kode'}] },
+    mapel: { title: 'Mata Pelajaran', fields: [{id:'kode', label:'Kode Mapel'}, {id:'nama', label:'Nama Pelajaran'}] },
+    jurnal: { title: 'Jurnal Harian', fields: [{id:'tanggal', label:'Tanggal', type:'date'}, {id:'kelasId', label:'Kelas', type:'dynamicSelect', source:'kelas', displayField:'kode'}, {id:'mapelId', label:'Mapel', type:'dynamicSelect', source:'mapel', displayField:'nama'}, {id:'materi', label:'Materi Pokok'}] }
+};
+
+function toggleFullScreenApp() { const docEl = document.documentElement; const req = docEl.requestFullscreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen; if(!document.fullscreenElement) { if(req) req.call(docEl).catch(e=>{}); document.getElementById('fullscreen-icon').className="fa-solid fa-compress"; } else { const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if(exit) exit.call(document).catch(e=>{}); document.getElementById('fullscreen-icon').className="fa-solid fa-expand"; } }
+function syncDarkModeIcons() { const isDark = AppState.ui.isDarkMode; const d1 = document.getElementById('dark-mode-icon'); const d2 = document.getElementById('dark-mode-icon-mobile'); if(d1) d1.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; if(d2) d2.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; }
+function toggleDarkMode() { document.documentElement.classList.toggle('dark'); AppState.ui.isDarkMode = document.documentElement.classList.contains('dark'); localStorage.setItem('ST_DARK_MODE', AppState.ui.isDarkMode); syncDarkModeIcons(); }
+if (AppState.ui.isDarkMode) { document.documentElement.classList.add('dark'); }
+syncDarkModeIcons();
+function openGuideModal() { document.getElementById('guide-modal').classList.remove('hidden'); }
+function closeGuideModal() { document.getElementById('guide-modal').classList.add('hidden'); }
+function openAudioSettingsModal() { document.getElementById('audio-settings-modal').classList.remove('hidden'); }
+function closeAudioSettingsModal() { document.getElementById('audio-settings-modal').classList.add('hidden'); }
 function updateUI() {
     const elTa = document.getElementById('sidebar-tahun-ajaran');
     if(elTa) elTa.innerText = `TA: ${AppState.db.sekolah.tahunAjaran || '-'} ${AppState.db.sekolah.semester || '-'}`;
