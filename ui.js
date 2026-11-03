@@ -819,3 +819,665 @@ function exportExcel(type) {
     
     showAlert("Berhasil", `File Excel ${namaSheet} berhasil diunduh!`, "success");
 }
+
+// ==========================================================
+// BAGIAN 2: PENGATURAN, PENILAIAN, ABSENSI (QR) & RAPOR
+// ==========================================================
+
+function renderPengaturan(container) {
+    container.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 lg:p-8 max-w-3xl mx-auto">
+            <h3 class="text-xl font-bold text-slate-800 dark:text-white mb-6 border-b dark:border-slate-800 pb-4"><i class="fa-solid fa-shield-halved text-brand-500 mr-2"></i>Pengaturan Sistem</h3>
+            
+
+            <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 mb-6 flex items-start space-x-4">
+                <div class="text-3xl text-emerald-500"><i class="fa-solid fa-cloud"></i></div>
+                <div class="w-full">
+                    <h4 class="font-bold text-emerald-800 dark:text-emerald-300 text-lg">Sinkronisasi Cloud (Google Sheets)</h4>
+                    <p class="text-sm text-emerald-700 dark:text-emerald-400 mb-3 mt-1">Masukkan Web App URL agar data tersimpan secara online.</p>
+                   <input type="text" id="setting-gas-url" readonly value="${getActiveWorkspace().url || ''}" placeholder="Belum ada URL Database di Ruang Kerja ini" class="w-full bg-slate-100 dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl px-4 py-2.5 text-sm outline-none mb-3 text-slate-500 cursor-not-allowed">
+<p class="text-xs text-slate-500 dark:text-slate-400 italic">*Tautan ini diambil secara otomatis dari pengaturan Ruang Kerja. Untuk mengubahnya, silakan buat/edit Ruang Kerja di menu samping.</p>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl p-5 mb-6 flex items-start space-x-4">
+                <div class="text-3xl text-blue-500"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                <div>
+                    <h4 class="font-bold text-slate-800 dark:text-white text-lg">Backup Database Lengkap</h4>
+                    <p class="text-sm text-slate-600 dark:text-slate-400 mb-4 mt-1">Unduh seluruh data menjadi satu file JSON.</p>
+                    <button onclick="backupJSON()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-md">Download Backup JSON</button>
+                </div>
+            </div>
+
+            <div class="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 flex items-start space-x-4">
+                <div class="text-3xl text-amber-500"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <div class="w-full">
+                    <h4 class="font-bold text-slate-800 dark:text-white text-lg">Restore Database (Pemulihan)</h4>
+                    <div class="flex items-center space-x-3 w-full mt-4">
+                        <input type="file" id="restore-file" accept=".json" class="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-sm cursor-pointer dark:text-white">
+                        <button onclick="restoreJSON()" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-6 rounded-xl shadow-md">Restore Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function saveGasUrlConfig() {
+    const url = document.getElementById('setting-gas-url').value.trim();
+    AppState.config.gasUrl = url;
+    localStorage.setItem('ST_GAS_URL', url);
+    showAlert("Berhasil", "URL Cloud Database berhasil disimpan!", "success");
+    renderPengaturan(document.getElementById('main-content'));
+    if(url) saveDatabase(); 
+}
+
+function saveGatewayUrlConfig() {
+    const url = document.getElementById('setting-gateway-url').value.trim();
+    AppState.config.gatewayUrl = url;
+    localStorage.setItem('ST_GATEWAY_URL', url);
+    showAlert("Berhasil", "Tautan Smart Gateway berhasil disimpan!", "success");
+    renderPengaturan(document.getElementById('main-content'));
+}
+
+function backupJSON() {
+    const fullBackup = {
+        version: "2.0",
+        db: AppState.db,
+        bankSoal: AppState.kuis.bankSoalManual,
+        config: { gasUrl: AppState.config.gasUrl }
+    };
+    
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup));
+    let link = document.createElement('a');
+    link.href = dataStr;
+    link.download = `Backup_SmartTeacher_Lengkap.json`;
+    link.click();
+}
+
+function restoreJSON() {
+    const fileInput = document.getElementById('restore-file');
+    if(!fileInput.files || fileInput.files.length === 0) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            
+            if (parsed.version && parsed.db && parsed.db.sekolah) {
+                AppState.db = parsed.db;
+                
+                if (parsed.bankSoal) {
+                    AppState.kuis.bankSoalManual = parsed.bankSoal;
+                    localStorage.setItem('smartTeacher_bankSoal', JSON.stringify(parsed.bankSoal));
+                }
+                
+                if (parsed.config && parsed.config.gasUrl) {
+                    AppState.config.gasUrl = parsed.config.gasUrl;
+                    localStorage.setItem('ST_GAS_URL', parsed.config.gasUrl);
+                }
+            } else if (parsed && parsed.sekolah) {
+                AppState.db = parsed;
+            } else {
+                throw new Error("Struktur data JSON tidak dikenali.");
+            }
+
+            forceSaveNotification();
+            showAlert("Berhasil", "Database dan Bank Soal sukses dipulihkan! Memuat ulang sistem...", "success");
+            setTimeout(() => window.location.reload(), 2000);
+            
+        } catch (err) { 
+            showAlert("Error", "Gagal memproses file JSON: " + err.message, "error"); 
+        }
+    };
+    reader.readAsText(fileInput.files[0]);
+}
+
+function renderPenilaian(container) {
+    let kelasOpts = AppState.db.kelas.map(k => `<option value="${k.id}">${k.kode}</option>`).join('');
+    let mapelOpts = AppState.db.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Kelas</label>
+                 <select id="penilaian-kelas" onchange="loadFormPenilaian()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 dark:text-white"><option value="">-- Pilih --</option>${kelasOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Mata Pelajaran</label>
+                 <select id="penilaian-mapel" onchange="loadFormPenilaian()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 dark:text-white"><option value="">-- Pilih --</option>${mapelOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Jenis Penilaian</label>
+                 <select id="penilaian-jenis" onchange="loadFormPenilaian()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 dark:text-white">
+                     <option value="Tugas">Tugas</option><option value="UTS">UTS</option><option value="UAS">UAS</option>
+                 </select></div>
+        </div>
+        <div id="penilaian-form-container"></div>
+    `;
+    loadFormPenilaian();
+}
+
+function loadFormPenilaian() {
+    const kelasId = document.getElementById('penilaian-kelas').value;
+    const mapelId = document.getElementById('penilaian-mapel').value;
+    const jenis = document.getElementById('penilaian-jenis').value;
+    const formContainer = document.getElementById('penilaian-form-container');
+
+    if(!kelasId || !mapelId) { formContainer.innerHTML = `<p class="text-slate-500 text-center py-10 bg-white dark:bg-slate-900 rounded-3xl border dark:border-slate-800">Pilih kelas dan mapel.</p>`; return; }
+
+    const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+    if(siswaKelas.length === 0) { formContainer.innerHTML = `<p class="text-rose-500 text-center py-10 bg-rose-50 dark:bg-rose-950/40 rounded-3xl border border-rose-100 dark:border-rose-900">Belum ada siswa di kelas ini.</p>`; return; }
+
+    let rows = siswaKelas.map((siswa, idx) => {
+        let existing = AppState.db.penilaian.find(p => p.siswaId === siswa.id && p.mapelId === mapelId && p.jenis === jenis);
+        let val = existing ? existing.nilai : '';
+        return `
+            <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                <td class="py-3 px-5 text-slate-500 text-sm w-12 text-center">${idx+1}</td>
+                <td class="py-3 px-5 text-sm font-bold text-slate-800 dark:text-white">${siswa.nama}</td>
+                <td class="py-3 px-5 text-center">
+                    <input type="number" id="nilai-${siswa.id}" value="${val}" min="0" max="100" class="w-24 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-brand-500 text-center font-black text-brand-700 dark:text-brand-300">
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    formContainer.innerHTML = `
+       <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden fade-in relative max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold sticky top-0 z-10 shadow-sm">
+                    <tr><th class="py-4 px-5 text-center">No</th><th class="py-4 px-5">Nama Lengkap Siswa</th><th class="py-4 px-5 text-center w-40">Input Nilai</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="p-5 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-800 flex justify-end">
+                <button onclick="simpanPenilaian('${kelasId}', '${mapelId}', '${jenis}')" class="bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg">Simpan Nilai ${jenis}</button>
+            </div>
+        </div>
+    `;
+}
+
+function simpanPenilaian(kelasId, mapelId, jenis) {
+    const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+    siswaKelas.forEach(siswa => {
+        let input = document.getElementById(`nilai-${siswa.id}`);
+        if(input && input.value !== '') {
+            let val = parseFloat(input.value);
+            let existingIndex = AppState.db.penilaian.findIndex(p => p.siswaId === siswa.id && p.mapelId === mapelId && p.jenis === jenis);
+            if(existingIndex >= 0) AppState.db.penilaian[existingIndex].nilai = val;
+            else AppState.db.penilaian.push({ id: generateId(), siswaId: siswa.id, mapelId: mapelId, kelasId: kelasId, jenis: jenis, nilai: val });
+        }
+    });
+    forceSaveNotification();
+}
+
+function hitungNilaiProporsional(siswaId, mapelId) {
+    let pTugas = AppState.db.penilaian.find(p => p.siswaId === siswaId && p.mapelId === mapelId && p.jenis === 'Tugas');
+    let pUTS = AppState.db.penilaian.find(p => p.siswaId === siswaId && p.mapelId === mapelId && p.jenis === 'UTS');
+    let pUAS = AppState.db.penilaian.find(p => p.siswaId === siswaId && p.mapelId === mapelId && p.jenis === 'UAS');
+
+    let hasTugas = pTugas && pTugas.nilai !== "" && pTugas.nilai !== null && !isNaN(pTugas.nilai);
+    let hasUTS = pUTS && pUTS.nilai !== "" && pUTS.nilai !== null && !isNaN(pUTS.nilai);
+    let hasUAS = pUAS && pUAS.nilai !== "" && pUAS.nilai !== null && !isNaN(pUAS.nilai);
+
+    let nTugas = hasTugas ? Number(pTugas.nilai) : null;
+    let nUTS = hasUTS ? Number(pUTS.nilai) : null;
+    let nUAS = hasUAS ? Number(pUAS.nilai) : null;
+
+    if (!hasTugas && !hasUTS && !hasUAS) {
+        return { akhir: 0, predikat: '-', nTugas: '-', nUTS: '-', nUAS: '-' };
+    }
+
+    let weightedSum = ((nTugas || 0) * 0.3) + ((nUTS || 0) * 0.3) + ((nUAS || 0) * 0.4);
+    let totalWeight = (hasTugas ? 0.3 : 0) + (hasUTS ? 0.3 : 0) + (hasUAS ? 0.4 : 0);
+    
+    let akhir = Math.round(weightedSum / totalWeight);
+    let predikat = akhir >= 90 ? 'A' : (akhir >= 80 ? 'B' : (akhir >= 70 ? 'C' : 'D'));
+
+    return {
+        akhir,
+        predikat,
+        nTugas: hasTugas ? nTugas : '-',
+        nUTS: hasUTS ? nUTS : '-',
+        nUAS: hasUAS ? nUAS : '-'
+    };
+}
+
+function renderRekapNilai(container) {
+    let kelasOpts = AppState.db.kelas.map(k => `<option value="${k.id}">${k.kode}</option>`).join('');
+    let mapelOpts = AppState.db.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Kelas</label>
+                 <select id="rekap-kelas" onchange="loadRekap()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white"><option value="">-- Pilih --</option>${kelasOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Mata Pelajaran</label>
+                 <select id="rekap-mapel" onchange="loadRekap()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white"><option value="">-- Pilih --</option>${mapelOpts}</select></div>
+        </div>
+        <div id="rekap-container"></div>
+    `;
+    loadRekap();
+}
+
+function loadRekap() {
+    const kelasId = document.getElementById('rekap-kelas').value;
+    const mapelId = document.getElementById('rekap-mapel').value;
+    const container = document.getElementById('rekap-container');
+
+    if(!kelasId || !mapelId) { container.innerHTML = ''; return; }
+    const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+
+    let rows = siswaKelas.map((siswa, idx) => {
+        const calc = hitungNilaiProporsional(siswa.id, mapelId);
+        
+        return `
+            <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                <td class="py-3.5 px-4 text-center">${idx+1}</td>
+                <td class="py-3.5 px-4 font-bold text-slate-800 dark:text-white">${siswa.nama}</td>
+                <td class="py-3.5 px-4 text-center">${calc.nTugas}</td>
+                <td class="py-3.5 px-4 text-center">${calc.nUTS}</td>
+                <td class="py-3.5 px-4 text-center">${calc.nUAS}</td>
+                <td class="py-3.5 px-4 text-center font-black">${calc.akhir || '-'}</td>
+                <td class="py-3.5 px-4 text-center font-bold text-slate-500">${calc.predikat}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden fade-in">
+            <table class="w-full text-left"><thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+                <tr><th class="py-4 px-4 text-center">No</th><th class="py-4 px-4">Nama Siswa</th><th class="py-4 px-4 text-center">Tugas (30%)</th><th class="py-4 px-4 text-center">UTS (30%)</th><th class="py-4 px-4 text-center">UAS (40%)</th><th class="py-4 px-4 text-center">Akhir</th><th class="py-4 px-4 text-center">Predikat</th></tr>
+            </thead><tbody>${rows}</tbody></table>
+        </div>
+    `;
+}
+
+function renderAbsensi(container) {
+    let kelasOpts = AppState.db.kelas.map(k => `<option value="${k.id}">${k.kode}</option>`).join('');
+    const nowLocal = new Date();
+    let today = nowLocal.getFullYear() + '-' + String(nowLocal.getMonth() + 1).padStart(2, '0') + '-' + String(nowLocal.getDate()).padStart(2, '0');
+
+    container.innerHTML = `
+        <!-- PEMILIHAN PERAN (ROLE) GURU -->
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 space-y-5 sticky top-0 z-30 shadow-md">
+            <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <label class="text-sm font-black text-slate-800 dark:text-white block mb-3">
+                    <i class="fa-solid fa-user-tie text-brand-500 mr-2"></i> Peran Anda Saat Ini:
+                </label>
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="inline-flex items-center cursor-pointer px-4 py-2.5 rounded-xl border border-brand-200 bg-brand-50 hover:bg-brand-100 dark:bg-emerald-900/30 dark:border-emerald-800 transition-all">
+                        <input type="radio" name="mode-absen" value="mapel" onchange="loadAbsensi()" checked class="w-5 h-5 accent-brand-600">
+                        <span class="ml-2 font-bold text-brand-800 dark:text-emerald-300 text-sm">Guru Mapel (Absen Harian)</span>
+                    </label>
+                    <label class="inline-flex items-center cursor-pointer px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800 transition-all">
+                        <input type="radio" name="mode-absen" value="walikelas" onchange="loadAbsensi()" class="w-5 h-5 accent-indigo-600">
+                        <span class="ml-2 font-bold text-indigo-800 dark:text-indigo-300 text-sm">Wali Kelas (Rekap 31 Hari)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div id="wadah-tanggal-absen">
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Tanggal</label>
+                    <input type="date" id="abs-tanggal" value="${today}" onchange="loadAbsensi()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white text-sm">
+                </div>
+                
+                <div id="wadah-bulan-absen" style="display: none;">
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Bulan (Rekap)</label>
+                    <input type="month" id="abs-bulan" value="${today.slice(0, 7)}" onchange="loadAbsensi()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white text-sm">
+                </div>
+
+                <div>
+                    <label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Kelas</label>
+                    <select id="abs-kelas" onchange="loadAbsensi()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white text-sm focus:ring-2 focus:ring-brand-500">
+                        <option value="">-- Pilih Kelas --</option>
+                        ${kelasOpts}
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="absensi-container"></div>
+    `;
+    loadAbsensi();
+}
+
+function loadAbsensi() {
+    const radioMode = document.querySelector('input[name="mode-absen"]:checked');
+    const mode = radioMode ? radioMode.value : 'mapel';
+    
+    const tanggal = document.getElementById('abs-tanggal').value;
+    const kelasId = document.getElementById('abs-kelas').value;
+    const container = document.getElementById('absensi-container');
+    const wadahTanggal = document.getElementById('wadah-tanggal-absen');
+    const wadahBulan = document.getElementById('wadah-bulan-absen');
+
+    if (mode === 'walikelas') {
+        wadahTanggal.classList.add('hidden');
+        if (wadahBulan) wadahBulan.style.display = 'block';
+    } else {
+        wadahTanggal.classList.remove('hidden');
+        if (wadahBulan) wadahBulan.style.display = 'none';
+    }
+
+    if(!kelasId) { 
+        container.innerHTML = `<p class="text-slate-500 text-center py-10 bg-white dark:bg-slate-900 rounded-3xl border dark:border-slate-800">Pilih kelas untuk menampilkan daftar hadir.</p>`; 
+        return; 
+    }
+
+    const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+    if(siswaKelas.length === 0) { 
+        container.innerHTML = `<p class="text-rose-500 text-center py-10 bg-rose-50 dark:bg-rose-950/40 rounded-3xl border border-rose-100 dark:border-slate-800">Belum ada siswa di kelas ini.</p>`; 
+        return; 
+    }
+
+    if (mode === 'mapel') {
+        if(!tanggal) return;
+        let rows = siswaKelas.map((siswa, idx) => {
+            let existing = AppState.db.absensi.find(a => a.siswaId === siswa.id && a.tanggal === tanggal && a.kelasId === kelasId);
+            let status = existing ? existing.status : 'H'; 
+            
+            const radio = (val, label, color) => `<label class="inline-flex items-center mr-4 cursor-pointer p-2 rounded-lg hover:bg-${color}-50 dark:hover:bg-slate-800"><input type="radio" name="abs-${siswa.id}" value="${val}" ${status === val ? 'checked' : ''} class="w-4 h-4 accent-brand-600"><span class="ml-2 text-sm font-bold text-slate-700 dark:text-slate-300">${label}</span></label>`;
+
+            return `<tr class="border-b border-slate-100 dark:border-slate-800"><td class="py-3 px-5 text-center">${idx+1}</td><td class="py-3 px-5 font-bold dark:text-white">${siswa.nama}</td><td class="py-3 px-5 bg-slate-50/30 dark:bg-slate-800/30">${radio('H','Hadir','emerald')}${radio('I','Izin','blue')}${radio('S','Sakit','amber')}${radio('A','Alpa','rose')}</td></tr>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden fade-in">
+                <!-- HEADER TABEL + TOMBOL SCAN -->
+                <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <h4 class="font-bold text-slate-800 dark:text-white text-sm"><i class="fa-solid fa-clipboard-user text-brand-500 mr-2"></i> Daftar Hadir</h4>
+                    
+                </div>
+                <table class="w-full text-left"><thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold"><tr><th class="py-4 px-5 text-center w-16">No</th><th class="py-4 px-5">Siswa</th><th class="py-4 px-5">Status Kehadiran</th></tr></thead><tbody>${rows}</tbody></table>
+                <div class="p-5 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-800 flex justify-end">
+                    <button onclick="simpanAbsensi('${tanggal}', '${kelasId}')" class="bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all">Simpan Kehadiran Harian</button>
+                </div>
+            </div>
+        `;
+    } else {
+        let headerTanggal = "";
+        for (let i = 1; i <= 31; i++) {
+            headerTanggal += `<th class="border border-slate-200 dark:border-slate-700 p-1 min-w-[28px] text-center">${i}</th>`;
+        }
+
+        let currentMonthPrefix = new Date().toISOString().slice(0, 8);
+        const elemenBulan = document.getElementById('abs-bulan');
+        if (elemenBulan && elemenBulan.value) {
+            currentMonthPrefix = elemenBulan.value + '-';
+        }
+
+        let rowsWali = siswaKelas.map((siswa, idx) => {
+            let tdAbsen = "";
+            let totH = 0, totS = 0, totI = 0, totA = 0;
+
+            for(let i=1; i<=31; i++) {
+                let tglStr = currentMonthPrefix + i.toString().padStart(2, '0');
+                let existing = AppState.db.absensi.find(a => a.siswaId === siswa.id && a.tanggal === tglStr && a.kelasId === kelasId);
+                
+                let stat = existing ? existing.status : '';
+                
+                if(stat==='H') totH++;
+                if(stat==='S') totS++;
+                if(stat==='I') totI++;
+                if(stat==='A') totA++;
+
+                let txtColor = 'text-slate-300';
+                let bgCell = '';
+                if(stat==='S') { txtColor = 'text-amber-500 font-black'; bgCell = 'bg-amber-50 dark:bg-amber-900/20'; }
+                if(stat==='I') { txtColor = 'text-blue-500 font-black'; bgCell = 'bg-blue-50 dark:bg-blue-900/20'; }
+                if(stat==='A') { txtColor = 'text-rose-500 font-black'; bgCell = 'bg-rose-50 dark:bg-rose-900/20'; }
+                if(stat==='H') { stat = 'H'; txtColor = 'text-emerald-500 font-bold'; bgCell = 'bg-emerald-50 dark:bg-emerald-900/20'; } 
+
+                tdAbsen += `<td onclick="ubahAbsenWali('${siswa.id}', '${tglStr}', '${kelasId}')" class="border border-slate-200 dark:border-slate-700 p-1 text-center text-xs cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${txtColor} ${bgCell}">${stat || '-'}</td>`;
+            }
+
+            return `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-center text-xs font-bold text-slate-500">${idx+1}</td>
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-xs font-bold whitespace-nowrap dark:text-white">${siswa.nama}</td>
+                    ${tdAbsen}
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-center text-xs font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-900/40">${totH}</td>
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-center text-xs font-black text-amber-500 bg-amber-50 dark:bg-amber-900/40">${totS}</td>
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-center text-xs font-black text-blue-500 bg-blue-50 dark:bg-blue-900/40">${totI}</td>
+                    <td class="border border-slate-200 dark:border-slate-700 p-2 text-center text-xs font-black text-rose-500 bg-rose-50 dark:bg-rose-900/40">${totA}</td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-5 fade-in">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h4 class="font-bold text-slate-800 dark:text-white"><i class="fa-solid fa-calendar-days text-indigo-500 mr-2"></i> Rekap Kehadiran (31 Hari)</h4>
+                        <p class="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg mt-1.5">Klik kotak untuk ubah manual, atau tekan tombol Tarik Data.</p>
+                    </div>
+                    <!-- TOMBOL TARIK DATA GATEWAY -->
+                    <button onclick="tarikDataGateway('${kelasId}')" id="btn-tarik-gateway" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md shadow-cyan-500/30 transition-all flex items-center shrink-0">
+                        <i class="fa-solid fa-satellite-dish mr-2 animate-pulse"></i> Tarik Data Smart Gateway
+                    </button>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar pb-3">
+                    <table class="w-max min-w-full text-left border-collapse border border-slate-200 dark:border-slate-700">
+                        <thead class="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 text-[10px] uppercase font-black">
+                            <tr>
+                                <th rowspan="2" class="border border-slate-200 dark:border-slate-700 p-2 text-center w-10">No</th>
+                                <th rowspan="2" class="border border-slate-200 dark:border-slate-700 p-2 w-48">Nama Lengkap Siswa</th>
+                                <th colspan="31" class="border border-slate-200 dark:border-slate-700 p-1 text-center">Tanggal</th>
+                                <th colspan="4" class="border border-slate-200 dark:border-slate-700 p-1 text-center">Total</th>
+                            </tr>
+                            <tr>
+                                ${headerTanggal}
+                                <th class="border border-slate-200 dark:border-slate-700 p-1 text-center text-emerald-600 w-8">H</th>
+                                <th class="border border-slate-200 dark:border-slate-700 p-1 text-center text-amber-600 w-8">S</th>
+                                <th class="border border-slate-200 dark:border-slate-700 p-1 text-center text-blue-600 w-8">I</th>
+                                <th class="border border-slate-200 dark:border-slate-700 p-1 text-center text-rose-600 w-8">A</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsWali}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+}
+
+let html5QrcodeScanner = null;
+
+function bukaScannerQR(tanggal, kelasId) {
+    if (typeof Html5QrcodeScanner === 'undefined') {
+        return showAlert("Tunggu", "Sedang mengunduh modul Kamera AI... Coba klik lagi dalam 3 detik.", "info");
+    }
+
+    if (!document.getElementById('qr-modal-scanner')) {
+        const modalHtml = `
+        <div id="qr-modal-scanner" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] hidden flex flex-col items-center justify-center p-4 transition-all">
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-2xl w-full max-w-sm text-center relative border border-slate-200 dark:border-slate-800">
+                <button onclick="tutupScannerQR()" class="absolute top-4 right-4 w-9 h-9 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-500 rounded-xl flex items-center justify-center font-bold transition-all"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-inner border border-emerald-200"><i class="fa-solid fa-qrcode"></i></div>
+                <h3 class="text-lg font-black text-slate-800 dark:text-white mb-1">Scanner Kartu Pelajar</h3>
+                <p class="text-xs text-slate-500 mb-5">Arahkan kamera HP ke QR Code/Barcode Nomor Induk Siswa (NIS) di kartu pelajar.</p>
+                
+                <div id="reader" class="w-full bg-black rounded-2xl overflow-hidden border-4 border-slate-200 dark:border-slate-800 aspect-square object-cover mb-2"></div>
+                
+                <div id="scan-result-toast" class="mt-4 p-3 bg-emerald-500 text-white font-black rounded-xl text-sm hidden transform scale-90 transition-all shadow-lg items-center justify-center h-12">
+                    <i class="fa-solid fa-circle-check mr-2 text-lg"></i> <span id="scan-name">Hadir!</span>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    document.getElementById('qr-modal-scanner').classList.remove('hidden');
+
+    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, false);
+    
+    html5QrcodeScanner.render((decodedText, decodedResult) => {
+        prosesHasilScan(decodedText, tanggal, kelasId);
+    }, (errorMessage) => { });
+}
+
+function tutupScannerQR() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(e => console.log(e));
+    }
+    document.getElementById('qr-modal-scanner').classList.add('hidden');
+    loadAbsensi(); 
+}
+
+function prosesHasilScan(nisAtauId, tanggal, kelasId) {
+    html5QrcodeScanner.pause();
+
+    const siswa = AppState.db.siswa.find(s => s.kelasId === kelasId && (s.nis === nisAtauId || s.id === nisAtauId));
+    
+    const toast = document.getElementById('scan-result-toast');
+    
+    if (siswa) {
+        let existingIndex = AppState.db.absensi.findIndex(a => a.siswaId === siswa.id && a.tanggal === tanggal && a.kelasId === kelasId);
+        if (existingIndex >= 0) {
+            AppState.db.absensi[existingIndex].status = 'H';
+        } else {
+            AppState.db.absensi.push({ id: generateId(), siswaId: siswa.id, kelasId, tanggal, status: 'H' });
+        }
+        
+        localStorage.setItem(AppState.config.storageKey, JSON.stringify(AppState.db));
+
+        if (typeof playTick === 'function') playTick(800); 
+
+        toast.className = "mt-4 p-3 bg-emerald-500 text-white font-black rounded-xl text-sm flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.5)] transform scale-100 transition-all h-12";
+        toast.innerHTML = `<i class="fa-solid fa-circle-check mr-2 text-lg"></i> ${siswa.nama} (HADIR)`;
+        
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.classList.replace('scale-100', 'scale-90');
+            html5QrcodeScanner.resume(); 
+        }, 1500);
+
+    } else {
+        if (typeof playTick === 'function') playTick(200); 
+        
+        toast.className = "mt-4 p-3 bg-rose-500 text-white font-black rounded-xl text-sm flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.5)] transform scale-100 transition-all h-12";
+        toast.innerHTML = `<i class="fa-solid fa-circle-xmark mr-2 text-lg"></i> NIS tidak terdaftar!`;
+        
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.classList.replace('scale-100', 'scale-90');
+            html5QrcodeScanner.resume();
+        }, 2000);
+    }
+}
+
+function ubahAbsenWali(siswaId, tanggal, kelasId) {
+    let existingIndex = AppState.db.absensi.findIndex(a => a.siswaId === siswaId && a.tanggal === tanggal && a.kelasId === kelasId);
+    let currentStatus = existingIndex >= 0 ? AppState.db.absensi[existingIndex].status : '';
+    let nextStatus = '';
+    
+    if (!currentStatus) nextStatus = 'H';
+    else if (currentStatus === 'H') nextStatus = 'S';
+    else if (currentStatus === 'S') nextStatus = 'I';
+    else if (currentStatus === 'I') nextStatus = 'A';
+    else if (currentStatus === 'A') nextStatus = ''; 
+    
+    if (nextStatus === '') {
+         if(existingIndex >= 0) AppState.db.absensi.splice(existingIndex, 1);
+    } else {
+         if (existingIndex >= 0) {
+             AppState.db.absensi[existingIndex].status = nextStatus;
+         } else {
+             AppState.db.absensi.push({ id: generateId(), siswaId, kelasId, tanggal, status: nextStatus });
+         }
+    }
+    
+    localStorage.setItem(AppState.config.storageKey, JSON.stringify(AppState.db));
+    if (AppState.config.gasUrl && AppState.config.gasUrl.startsWith("http")) {
+        fetch(AppState.config.gasUrl, { method: "POST", mode: "no-cors", body: JSON.stringify(AppState.db) }).catch(()=>{});
+    }
+    
+    loadAbsensi();
+}
+
+function simpanAbsensi(tanggal, kelasId) {
+    const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+    siswaKelas.forEach(siswa => {
+        const selectedRadio = document.querySelector(`input[name="abs-${siswa.id}"]:checked`);
+        if (selectedRadio) {
+            const status = selectedRadio.value;
+            const existingIndex = AppState.db.absensi.findIndex(
+                a => a.siswaId === siswa.id && a.tanggal === tanggal && a.kelasId === kelasId
+            );
+            if (existingIndex >= 0) {
+                AppState.db.absensi[existingIndex].status = status;
+            } else {
+                AppState.db.absensi.push({
+                    id: generateId(),
+                    siswaId: siswa.id,
+                    kelasId: kelasId,
+                    tanggal: tanggal,
+                    status: status
+                });
+            }
+        }
+    });
+    forceSaveNotification();
+}
+
+function renderRapor(container) {
+    let kelasOpts = AppState.db.kelas.map(k => `<option value="${k.id}">${k.kode}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 grid grid-cols-1 md:grid-cols-2 gap-5 no-print">
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Kelas</label>
+                 <select id="rapor-kelas" onchange="loadSiswaRapor()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white"><option value="">-- Pilih --</option>${kelasOpts}</select></div>
+            <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Pilih Siswa</label>
+                 <select id="rapor-siswa" onchange="generateRapor()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none dark:text-white"><option value="">-- Menunggu Kelas --</option></select></div>
+        </div>
+        <div id="rapor-cetak-container" class="bg-white p-10 rounded-xl shadow-xl border border-slate-200 hidden mx-auto max-w-4xl"></div>
+    `;
+}
+
+function loadSiswaRapor() {
+    const kelasId = document.getElementById('rapor-kelas').value;
+    const selectSiswa = document.getElementById('rapor-siswa');
+    if(!kelasId) { selectSiswa.innerHTML = '<option value="">-- Pilih --</option>'; return; }
+    let opts = AppState.db.siswa.filter(s => s.kelasId === kelasId).map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
+    selectSiswa.innerHTML = `<option value="">-- Pilih Siswa --</option>${opts}`;
+}
+
+function generateRapor() {
+    const siswaId = document.getElementById('rapor-siswa').value;
+    const container = document.getElementById('rapor-cetak-container');
+    if(!siswaId) { container.classList.add('hidden'); return; }
+
+    const siswa = AppState.db.siswa.find(s => s.id === siswaId);
+    const kelas = AppState.db.kelas.find(k => k.id === siswa.kelasId);
+    
+    let barisMapel = AppState.db.mapel.map((mapel, idx) => {
+        const calc = hitungNilaiProporsional(siswa.id, mapel.id);
+        let deskripsi = calc.akhir >= 90 ? `Sangat mahir dalam memahami seluruh kompetensi ${mapel.nama}.` : (calc.akhir >= 80 ? `Baik dalam menguasai kompetensi dasar ${mapel.nama}.` : (calc.akhir > 0 ? `Perlu bimbingan lebih lanjut pada beberapa materi ${mapel.nama}.` : '-'));
+        
+        return `<tr class="border-b border-black"><td class="py-2 px-3 text-center border-r border-black">${idx+1}</td><td class="py-2 px-3 border-r border-black font-semibold">${mapel.nama}</td><td class="py-2 px-3 text-center border-r border-black font-bold">${calc.akhir || '-'}</td><td class="py-2 px-3 text-center border-r border-black font-bold">${calc.akhir ? calc.predikat : '-'}</td><td class="py-2 px-3 text-xs">${deskripsi}</td></tr>`;
+    }).join('');
+
+    const absenSiswa = AppState.db.absensi.filter(a => a.siswaId === siswa.id);
+    const jmlSakit = absenSiswa.filter(a => a.status === 'S').length;
+    const jmlIzin = absenSiswa.filter(a => a.status === 'I').length;
+    const jmlAlpa = absenSiswa.filter(a => a.status === 'A').length;
+
+    container.innerHTML = `
+        <div class="text-black font-serif text-sm">
+            <div class="text-center mb-8 border-b-4 border-black pb-4"><h2 class="text-2xl font-black uppercase tracking-widest">LAPORAN HASIL BELAJAR (RAPOR)</h2><h3 class="text-xl font-bold uppercase mt-1">${AppState.db.sekolah.nama}</h3><p class="text-xs font-normal mt-1">${AppState.db.sekolah.alamat || ''}</p></div>
+            <div class="flex justify-between mb-6 font-semibold"><table class="w-1/2"><tr><td class="w-32 py-1">Nama Siswa</td><td>: <span class="font-bold">${siswa.nama}</span></td></tr><tr><td class="py-1">NIS</td><td>: ${siswa.nis || '-'}</td></tr></table><table class="w-1/2"><tr><td class="w-40 py-1">Kelas</td><td>: ${kelas ? kelas.kode : '-'}</td></tr><tr><td class="py-1">Tahun Ajaran</td><td>: ${AppState.db.sekolah.tahunAjaran} (${AppState.db.sekolah.semester})</td></tr></table></div>
+            <table class="w-full border-collapse border-2 border-black mb-6"><thead class="bg-slate-100 font-bold text-center"><tr class="border-b-2 border-black"><th class="py-3 px-3 w-10 border-r border-black">No</th><th class="py-3 px-3 border-r border-black">Mata Pelajaran</th><th class="py-3 px-3 w-20 border-r border-black">Nilai Akhir</th><th class="py-3 px-3 w-20 border-r border-black">Predikat</th><th class="py-3 px-3">Capaian Kompetensi</th></tr></thead><tbody>${barisMapel}</tbody></table>
+            
+            <div class="w-64 border-2 border-black mb-10">
+                <div class="bg-slate-100 font-bold py-1.5 px-3 border-b-2 border-black text-center">Ketidakhadiran</div>
+                <table class="w-full text-xs">
+                    <tr class="border-b border-black"><td class="py-1.5 px-3">Sakit</td><td class="py-1.5 px-3 text-right font-bold">${jmlSakit} hari</td></tr>
+                    <tr class="border-b border-black"><td class="py-1.5 px-3">Izin</td><td class="py-1.5 px-3 text-right font-bold">${jmlIzin} hari</td></tr>
+                    <tr><td class="py-1.5 px-3">Tanpa Keterangan</td><td class="py-1.5 px-3 text-right font-bold">${jmlAlpa} hari</td></tr>
+                </table>
+            </div>
+
+            <div class="flex justify-between mt-12 px-10"><div class="text-center"><p class="mb-20">Mengetahui,<br>Kepala Sekolah</p><p class="font-bold border-b border-black inline-block px-4">${AppState.db.sekolah.kepsek}</p><p class="text-xs mt-1">NIP. ${AppState.db.sekolah.nip || '-'}</p></div><div class="text-center"><p class="mb-20"><br>Wali Kelas</p><p class="font-bold border-b border-black inline-block px-4">${kelas ? kelas.wali : '_____________________'}</p></div></div>
+            <div class="text-center mt-12 no-print border-t border-slate-200 pt-8"><button onclick="window.print()" class="bg-slate-900 text-white font-bold py-3.5 px-10 rounded-xl shadow-2xl"><i class="fa-solid fa-print mr-2"></i> Cetak Rapor (PDF)</button></div>
+        </div>
+    `;
+    container.classList.remove('hidden');
+}
