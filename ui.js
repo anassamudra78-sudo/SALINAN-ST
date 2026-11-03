@@ -3071,3 +3071,368 @@ function renderKuisPlayer(index, score) {
     }
     mulaiTimerKuis(index, score);
 }
+
+// ==========================================================
+// BAGIAN 4: MULTI-WORKSPACE & AUTENTIKASI DATABASE GOOGLE
+// ==========================================================
+
+function toggleForm(mode) {
+    document.getElementById('auth-error-msg').classList.add('hidden');
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('reg-username').value = '';
+    document.getElementById('reg-password').value = '';
+
+    if (mode === 'daftar') {
+        document.getElementById('form-masuk').classList.add('hidden');
+        document.getElementById('form-daftar').classList.remove('hidden');
+    } else {
+        document.getElementById('form-daftar').classList.add('hidden');
+        document.getElementById('form-masuk').classList.remove('hidden');
+    }
+}
+
+window.addEventListener('DOMContentLoaded', async () => { 
+    setTimeout(() => {
+        const loader = document.getElementById('app-preloader');
+        if(loader) {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 500);
+        }
+    }, 1000);
+
+    try {
+        await loadDatabase(); 
+    } catch(e) {
+        console.error("Gagal load database awal:", e);
+    }
+
+    const savedUser = localStorage.getItem('smart_teacher_user');
+    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
+
+    if (savedUser && savedUrl.startsWith("http")) {
+        const loginScreen = document.getElementById('login-screen');
+        if (loginScreen) loginScreen.style.display = 'none';
+    } else {
+        cekDanValidasiGasUrl();
+    }
+});
+
+function cekDanValidasiGasUrl() {
+    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
+    const loginScreen = document.getElementById('login-screen');
+    const setupModal = document.getElementById('setup-db-modal');
+
+    if (!savedUrl || !savedUrl.startsWith("http")) {
+        localStorage.removeItem('smart_teacher_user');
+        if (setupModal) setupModal.classList.remove('hidden');
+        if (loginScreen) {
+            loginScreen.classList.remove('hidden');
+            loginScreen.style.display = 'flex'; 
+        }
+    } else {
+        if (setupModal) setupModal.classList.add('hidden');
+    }
+}
+
+function simpanSetupGasUrl() {
+    const inputUrl = document.getElementById('modal-gas-url-input').value.trim();
+    if (!inputUrl || !inputUrl.startsWith("http")) {
+        return alert("Harap masukkan tautan Web App Apps Script yang valid berakhiran /exec!");
+    }
+    
+    localStorage.setItem('ST_GAS_URL', inputUrl);
+    AppState.config.gasUrl = inputUrl;
+    
+    alert("Tautan database berhasil disimpan! Memuat ulang aplikasi...");
+    window.location.reload();
+}
+
+function tutupModalSetup() {
+    document.getElementById('setup-db-modal').classList.add('hidden');
+}
+
+function salinKodeBackend() {
+    var copyText = document.getElementById("kode-backend-gas");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); 
+    
+    try {
+        navigator.clipboard.writeText(copyText.value).then(() => {
+            alert("Kode berhasil disalin! Silakan paste di Google Apps Script.");
+        });
+    } catch (err) {
+        document.execCommand('copy');
+        alert("Kode berhasil disalin! Silakan paste di Google Apps Script.");
+    }
+}
+
+async function prosesLogin() {
+    var user = document.getElementById('login-username').value.trim();
+    var pass = document.getElementById('login-password').value.trim();
+    var errorMsg = document.getElementById('auth-error-msg');
+    
+    var gasAuthUrl = localStorage.getItem('ST_GAS_URL') || "";
+    if (!gasAuthUrl) {
+        cekDanValidasiGasUrl();
+        return;
+    }
+
+    if (user === "" || pass === "") {
+        errorMsg.innerText = "Username dan sandi wajib diisi!";
+        errorMsg.classList.remove('hidden');
+        return;
+    }
+
+    errorMsg.innerText = "Menghubungkan ke database Anda...";
+    errorMsg.classList.remove('hidden');
+
+    try {
+        let url = gasAuthUrl + "?action=login&username=" + encodeURIComponent(user) + "&password=" + encodeURIComponent(pass);
+        let response = await fetch(url);
+        let text = await response.text();
+
+        if (text.trim().startsWith("<")) {
+            throw new Error("Akses diblokir Google. Pastikan izin Web App diatur ke 'Siapa saja'.");
+        }
+
+        let result = JSON.parse(text);
+
+        if (result.status === "success") {
+            localStorage.setItem('smart_teacher_user', user);
+            document.getElementById('login-screen').style.display = 'none';
+        } else {
+            errorMsg.innerText = result.message || "Username atau sandi salah!";
+        }
+    } catch (err) {
+        errorMsg.innerText = "Gagal: " + err.message;
+    }
+}
+
+async function prosesDaftar() {
+    var user = document.getElementById('reg-username').value.trim();
+    var pass = document.getElementById('reg-password').value.trim();
+    var errorMsg = document.getElementById('auth-error-msg');
+    
+    var gasAuthUrl = localStorage.getItem('ST_GAS_URL') || "";
+    if (!gasAuthUrl) {
+        cekDanValidasiGasUrl();
+        return;
+    }
+
+    if (user === "" || pass === "") {
+        errorMsg.innerText = "Username dan sandi wajib diisi!";
+        errorMsg.classList.remove('hidden');
+        return;
+    }
+
+    errorMsg.innerText = "Mendaftarkan akun baru ke database Anda...";
+    errorMsg.classList.remove('hidden');
+
+    try {
+        let url = gasAuthUrl + "?action=register&username=" + encodeURIComponent(user) + "&password=" + encodeURIComponent(pass);
+        let response = await fetch(url);
+        let text = await response.text();
+
+        if (text.trim().startsWith("<")) {
+            throw new Error("Akses diblokir Google. Pastikan izin Web App diatur ke 'Siapa saja'.");
+        }
+
+        let result = JSON.parse(text);
+
+        if (result.status === "success") {
+            localStorage.setItem('smart_teacher_user', user);
+            document.getElementById('login-screen').style.display = 'none';
+        } else {
+            errorMsg.innerText = result.message || "Username sudah dipakai!";
+        }
+    } catch (err) {
+        errorMsg.innerText = "Gagal: " + err.message;
+    }
+}
+
+let workspaces = JSON.parse(localStorage.getItem('ST_WORKSPACES')) || [];
+let activeWsId = localStorage.getItem('ST_ACTIVE_WS_ID');
+
+if (workspaces.length === 0) {
+    let defaultWs = { id: 'ws_' + Date.now(), nama: 'Ruang Kerja Utama', url: '', npsn: '' };
+    workspaces.push(defaultWs);
+    activeWsId = defaultWs.id;
+    simpanWsKeStorage();
+}
+
+function simpanWsKeStorage() {
+    localStorage.setItem('ST_WORKSPACES', JSON.stringify(workspaces));
+    localStorage.setItem('ST_ACTIVE_WS_ID', activeWsId);
+
+    let idGuru = localStorage.getItem('ST_ID_GURU');
+    if (!idGuru || idGuru === "") {
+        idGuru = prompt("Masukkan Nama Anda untuk pencadangan Ruang Kerja di Server Pusat\n(Contoh: Pak Anas / Kelas 8A):", "Pak Anas");
+        if (!idGuru) idGuru = "Guru_Anonim"; 
+        localStorage.setItem('ST_ID_GURU', idGuru);
+    }
+
+    let dataBackup = JSON.stringify(workspaces);
+    fetch(URL_GATEWAY_PUSAT + "?action=simpanWorkspace&id=" + encodeURIComponent(idGuru) + "&link=" + encodeURIComponent(dataBackup))
+    .then(response => response.json())
+    .then(data => { console.log("Salinan Ruang Kerja berhasil diamankan."); })
+    .catch(error => { console.error("Koneksi pencadangan tertunda:", error); });
+}
+
+function getActiveWorkspace() {
+    return workspaces.find(w => w.id === activeWsId) || workspaces[0];
+}
+
+function renderLabelWorkspace() {
+    const active = getActiveWorkspace();
+    const labelEl = document.getElementById('label-ruang-kerja');
+    if(labelEl) labelEl.innerText = active.nama;
+}
+
+document.addEventListener('DOMContentLoaded', renderLabelWorkspace);
+if (typeof renderLabelWorkspace === "function") renderLabelWorkspace();
+
+function bukaModalWorkspace() {
+    const modal = document.getElementById('modal-workspace');
+    const content = document.getElementById('modal-workspace-content');
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-95');
+    }, 10);
+    renderListWorkspace();
+}
+
+function tutupModalWorkspace() {
+    const modal = document.getElementById('modal-workspace');
+    const content = document.getElementById('modal-workspace-content');
+    modal.classList.add('opacity-0');
+    content.classList.add('scale-95');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+    document.getElementById('form-tambah-ws').classList.add('hidden');
+}
+
+let editWsIdTerpilih = null;
+
+function toggleFormTambahWs() {
+    document.getElementById('form-tambah-ws').classList.toggle('hidden');
+    document.getElementById('ws-nama').value = '';
+    document.getElementById('ws-url').value = '';
+    document.getElementById('ws-npsn').value = '';
+    editWsIdTerpilih = null; 
+}
+
+function renderListWorkspace() {
+    const listContainer = document.getElementById('list-workspace');
+    listContainer.innerHTML = '';
+
+    workspaces.forEach(ws => {
+        const isActive = ws.id === activeWsId;
+        const div = document.createElement('div');
+        
+        div.className = `p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-all ${isActive ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-800/50 border-slate-700 hover:bg-slate-700'}`;
+        div.onclick = () => pindahWorkspace(ws.id);
+
+        let tombolAksi = '';
+        if (ws.id !== 'utama') {
+            tombolAksi = `
+                <button onclick="editRuangKerja('${ws.id}', event)" class="w-8 h-8 rounded-full bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white flex items-center justify-center transition-colors shadow-sm" title="Edit">
+                    <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+                <button onclick="hapusRuangKerja('${ws.id}', event)" class="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm" title="Hapus">
+                    <i class="fa-solid fa-trash-can text-sm"></i>
+                </button>
+            `;
+        }
+
+        div.innerHTML = `
+            <div>
+                <h4 class="text-sm font-bold text-white">${ws.nama}</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">NPSN: ${ws.npsn || '-'} | URL Database: ${ws.url ? 'Tersimpan' : 'Kosong'}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                ${isActive ? '<i class="fa-solid fa-circle-check text-indigo-400 text-lg mr-1"></i>' : ''}
+                ${tombolAksi}
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+}
+
+function hapusRuangKerja(idHapus, event) {
+    event.stopPropagation(); 
+    if (confirm("Yakin ingin menghapus ruang kerja ini dari memori?")) {
+        const index = workspaces.findIndex(ws => ws.id === idHapus);
+        if (index !== -1) {
+            workspaces.splice(index, 1);
+            localStorage.setItem('ST_WORKSPACES', JSON.stringify(workspaces));
+            renderListWorkspace();
+            alert("Ruang kerja berhasil dihapus!");
+        }
+    }
+}
+
+function editRuangKerja(idEdit, event) {
+    event.stopPropagation(); 
+    const index = workspaces.findIndex(ws => ws.id === idEdit);
+    if (index !== -1) {
+        const dataLama = workspaces[index];
+        document.getElementById('form-tambah-ws').classList.remove('hidden');
+        document.getElementById('ws-nama').value = dataLama.nama || '';
+        document.getElementById('ws-url').value = dataLama.url || '';
+        document.getElementById('ws-npsn').value = dataLama.npsn || '';
+        
+        editWsIdTerpilih = idEdit;
+        document.getElementById('form-tambah-ws').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function pindahWorkspace(id) {
+    if (activeWsId === id) return; 
+    const targetWs = workspaces.find(w => w.id === id);
+    if (targetWs) {
+        localStorage.setItem('ST_GAS_URL', targetWs.url || "");
+    }
+    activeWsId = id;
+    simpanWsKeStorage();
+    window.location.reload(); 
+}
+
+function simpanWorkspaceBaru() {
+    const nama = document.getElementById('ws-nama').value.trim();
+    const url = document.getElementById('ws-url').value.trim();
+    const npsn = document.getElementById('ws-npsn').value.trim();
+    
+    if (!nama) return alert("Nama instansi wajib diisi, Bosku!");
+
+    if (editWsIdTerpilih) {
+        const index = workspaces.findIndex(ws => ws.id === editWsIdTerpilih);
+        if (index !== -1) {
+            workspaces[index].nama = nama;
+            workspaces[index].url = url;
+            workspaces[index].npsn = npsn;
+            if (editWsIdTerpilih === activeWsId) {
+                localStorage.setItem('ST_GAS_URL', url || "");
+            }
+        }
+        editWsIdTerpilih = null; 
+        alert("Data Ruang Kerja berhasil diperbarui!");
+    } else {
+        const newWs = { id: 'ws_' + Date.now(), nama: nama, url: url, npsn: npsn };
+        workspaces.push(newWs);
+        activeWsId = newWs.id; 
+        localStorage.setItem('ST_GAS_URL', url || "");
+        alert("Ruang Kerja baru berhasil ditambahkan!");
+    }
+    
+    simpanWsKeStorage();
+    window.location.reload();
+}
+
+const URL_GATEWAY_PUSAT = "https://script.google.com/macros/s/AKfycbzcHLMR_oS83RcSUucJ5PWEkD7MxIAkNf_vQ-tDOHaUeJ-AelGf0KmPZTCW9EGyEHxJ/exec";
+   
+let savedUrl = localStorage.getItem('ST_GAS_URL');
+if (!savedUrl || savedUrl === "") {
+    savedUrl = URL_GATEWAY_PUSAT; 
+    localStorage.setItem('ST_GAS_URL', savedUrl);
+}
