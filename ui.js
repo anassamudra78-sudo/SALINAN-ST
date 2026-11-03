@@ -3493,3 +3493,1172 @@ if (!savedUrl || savedUrl === "") {
     savedUrl = URL_GATEWAY_PUSAT; 
     localStorage.setItem('ST_GAS_URL', savedUrl);
 }
+
+// ==========================================================
+// BAGIAN 5 (PELENGKAP): PODIUM, BANK SOAL, PRESENTATION STUDIO & GATEWAY
+// ==========================================================
+
+AppState.kuis.waktuResetSesi = AppState.kuis.waktuResetSesi || 0;
+
+function resetPodiumSesiIni() {
+    if(confirm("Kosongkan Papan Podium & 10 Besar untuk Sesi ini? (Data nilai tetap aman di menu Rekap Nilai)")) {
+        AppState.kuis.waktuResetSesi = Date.now(); 
+        bukaPapanSkorPodium(); 
+    }
+}
+
+function bukaPapanSkorPodium() {
+    playSoundEffect('podium');
+    const container = document.getElementById('main-content');
+    
+    let sumberData = AppState.db.penilaian || [];
+    const awalHariIni = new Date().setHours(0, 0, 0, 0); 
+    
+    sumberData = sumberData.filter(p => {
+        const waktuMain = p.timestamp || 0;
+        const validWaktu = waktuMain >= awalHariIni && waktuMain >= AppState.kuis.waktuResetSesi;
+        const validKelas = AppState.kuis.kelasAktif ? p.kelasId === AppState.kuis.kelasAktif : true;
+        const validMapel = AppState.kuis.mapelAktif ? p.mapelId === AppState.kuis.mapelAktif : true;
+        return validWaktu && validKelas && validMapel;
+    });
+
+    let listNilai = sumberData.map(p => {
+        let refSiswa = AppState.db.siswa.find(s => s.id === p.siswaId);
+        let refKelas = AppState.db.kelas.find(k => k.id === p.kelasId);
+        return {
+            nama: refSiswa ? refSiswa.nama : 'Pemain',
+            kelas: refKelas ? refKelas.kode : '-',
+            nilai: p.nilai || 0
+        };
+    }).sort((a,b) => b.nilai - a.nilai);
+
+    let j1 = listNilai[0] || { nama: 'Menunggu Pemain...', kelas: '-', nilai: 0 };
+    let j2 = listNilai[1] || { nama: '-', kelas: '-', nilai: 0 };
+    let j3 = listNilai[2] || { nama: '-', kelas: '-', nilai: 0 };
+
+    let top10Rows = listNilai.slice(3, 13).map((item, i) => `
+        <tr class="border-b border-slate-100 dark:border-slate-800 opacity-0" style="animation: fadeIn 0.4s forwards; animation-delay: ${3.5 + (i * 0.15)}s;">
+            <td class="py-2.5 px-4 font-bold text-slate-500">${i + 4}</td>
+            <td class="py-2.5 px-4 font-bold text-slate-800 dark:text-white">${item.nama}</td>
+            <td class="py-2.5 px-4 text-center font-bold text-slate-500">${item.kelas}</td>
+            <td class="py-2.5 px-4 text-right font-black text-emerald-500">${item.nilai}</td>
+        </tr>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="max-w-4xl mx-auto space-y-6 fade-in">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+                <button onclick="switchTab('kuis')" class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-2.5 px-5 rounded-xl text-xs">
+                    <i class="fa-solid fa-arrow-left mr-2"></i> Kembali
+                </button>
+                <h3 class="text-lg sm:text-xl font-black text-slate-800 dark:text-white opacity-0" style="animation: fadeIn 0.5s forwards; animation-delay: 0.2s;">
+                    <i class="fa-solid fa-trophy text-amber-400 mr-2"></i>PODIUM HARIAN & KELAS
+                </h3>
+                <button onclick="resetPodiumSesiIni()" class="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-sm">
+                    <i class="fa-solid fa-rotate-left mr-1.5"></i> Reset Podium Sesi Ini
+                </button>
+            </div>
+
+            <div class="bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 rounded-3xl p-8 text-white shadow-2xl border border-amber-500/30 text-center relative overflow-hidden">
+                <div class="grid grid-cols-3 gap-3 items-end max-w-xl mx-auto pt-8 pb-4">
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.6s forwards; animation-delay: 1.5s;">
+                        <div class="w-12 h-12 rounded-full bg-slate-300 text-slate-900 flex items-center justify-center font-black text-lg shadow-lg mb-2 ring-4 ring-slate-400">2</div>
+                        <p class="text-xs font-bold text-white truncate max-w-[90px]">${j2.nama}</p>
+                        <p class="text-[10px] text-slate-300">${j2.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-slate-600 to-slate-400 h-28 rounded-t-2xl mt-2 flex items-center justify-center font-black text-2xl shadow-inner">${j2.nilai > 0 ? j2.nilai : '-'}</div>
+                    </div>
+
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.8s forwards; animation-delay: 2.5s;">
+                        <i class="fa-solid fa-crown text-3xl text-yellow-300 mb-1 animate-bounce"></i>
+                        <div class="w-16 h-16 rounded-full bg-yellow-400 text-slate-950 flex items-center justify-center font-black text-2xl shadow-2xl mb-2 ring-4 ring-yellow-300">1</div>
+                        <p class="text-sm font-black text-yellow-300 truncate max-w-[110px]">${j1.nama}</p>
+                        <p class="text-xs text-amber-200 font-bold">${j1.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-amber-600 via-yellow-500 to-amber-400 h-40 rounded-t-2xl mt-2 flex items-center justify-center font-black text-3xl shadow-2xl text-slate-950">${j1.nilai > 0 ? j1.nilai : '-'}</div>
+                    </div>
+
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.6s forwards; animation-delay: 0.5s;">
+                        <div class="w-12 h-12 rounded-full bg-amber-700 text-white flex items-center justify-center font-black text-lg shadow-lg mb-2 ring-4 ring-amber-600">3</div>
+                        <p class="text-xs font-bold text-white truncate max-w-[90px]">${j3.nama}</p>
+                        <p class="text-[10px] text-slate-300">${j3.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-amber-900 to-amber-700 h-20 rounded-t-2xl mt-2 flex items-center justify-center font-black text-xl shadow-inner">${j3.nilai > 0 ? j3.nilai : '-'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm opacity-0" style="animation: fadeIn 0.6s forwards; animation-delay: 3.5s;">
+                <h4 class="font-bold text-slate-800 dark:text-white text-sm mb-4"><i class="fa-solid fa-list-ol mr-2 text-indigo-500"></i>Peringkat Top 10 Lainnya (Sesi Ini)</h4>
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-bold uppercase">
+                        <tr><th class="py-2.5 px-4 w-12">Rank</th><th class="py-2.5 px-4">Nama Siswa</th><th class="py-2.5 px-4 text-center">Kelas</th><th class="py-2.5 px-4 text-right">Skor Kuis</th></tr>
+                    </thead>
+                    <tbody>${top10Rows || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Belum ada peringkat untuk sesi ini.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    setTimeout(() => confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } }), 2500);
+}
+
+function bukaBedahSoalTersulit() {
+    let entries = Object.entries(AppState.db.mispersepsiSoal || {}).sort((a,b) => b[1] - a[1]);
+    if (entries.length === 0) return;
+
+    let topSalah = entries[0];
+    let soalObj = AppState.kuis.bankSoalManual.find(s => s.id === topSalah[0]);
+    if (!soalObj) return;
+
+    document.getElementById('bedah-stats-text').innerText = `Dijawab salah oleh ${topSalah[1]} siswa`;
+    
+    let opsiList = soalObj.opsi.map((o, idx) => {
+        let isKunci = idx === soalObj.jawaban_benar_index;
+        return `
+            <div class="p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${isKunci ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                <span>${String.fromCharCode(65+idx)}. ${o}</span>
+                ${isKunci ? '<span class="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black">KUNCI BENAR</span>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('bedah-soal-content').innerHTML = `
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700">
+            <p class="text-xs text-slate-400 font-bold mb-1">Pertanyaan Soal:</p>
+            <p class="text-sm font-bold text-white">${soalObj.soal}</p>
+        </div>
+        <div class="space-y-2">${opsiList}</div>
+    `;
+
+    document.getElementById('bedah-soal-modal').classList.remove('hidden');
+}
+
+function closeBedahSoalModal() {
+    document.getElementById('bedah-soal-modal').classList.add('hidden');
+}
+
+let undoBufferSoal = null;
+let undoTimeoutId = null;
+
+function bukaModalBankSoal() {
+    renderDaftarSoalModal();
+    document.getElementById('bank-soal-modal').classList.remove('hidden');
+}
+
+function tutupModalBankSoal() {
+    document.getElementById('bank-soal-modal').classList.add('hidden');
+}
+
+function renderDaftarSoalModal() {
+    const listContainer = document.getElementById('modal-bank-list');
+    const counterBadge = document.getElementById('modal-bank-counter');
+    const headerBadge = document.getElementById('header-bank-badge');
+    const searchVal = (document.getElementById('search-soal-input')?.value || '').toLowerCase();
+
+    const totalSoal = AppState.kuis.bankSoalManual.length;
+    if (counterBadge) counterBadge.innerText = `${totalSoal} Soal`;
+    if (headerBadge) headerBadge.innerText = totalSoal;
+
+    if (totalSoal === 0) {
+        listContainer.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs font-bold">Bank soal masih kosong</div>`;
+        return;
+    }
+
+    let filtered = AppState.kuis.bankSoalManual.map((item, idx) => ({ ...item, originalIndex: idx }));
+    if (searchVal) {
+        filtered = filtered.filter(item => 
+            item.soal.toLowerCase().includes(searchVal) || 
+            item.opsi.some(o => o.toLowerCase().includes(searchVal))
+        );
+    }
+
+    listContainer.innerHTML = filtered.map(item => {
+        const idx = item.originalIndex;
+        return `
+            <div id="card-soal-${idx}" class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 transition-all">
+                <div id="view-soal-${idx}">
+                    <div class="flex justify-between items-start gap-3 mb-2">
+                        <div class="flex items-start gap-2.5">
+                            <span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-black px-2.5 py-1 rounded-xl shrink-0">#${idx + 1}</span>
+                            <p class="text-xs font-bold text-slate-100 leading-relaxed">${item.soal}</p>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <button onclick="toggleInlineEditSoal(${idx})" class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 flex items-center justify-center transition-colors"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                            <button onclick="hapusSoalDenganUndo(${idx})" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-2 border-t border-white/5 text-xs">
+                        ${item.opsi.map((op, oIdx) => `
+                            <div class="px-3 py-1.5 rounded-xl border flex items-center justify-between ${oIdx === item.jawaban_benar_index ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-400'}">
+                                <span>${String.fromCharCode(65 + oIdx)}. ${op}</span>${oIdx === item.jawaban_benar_index ? '<i class="fa-solid fa-check text-emerald-400 text-xs"></i>' : ''}
+                            </div>`).join('')}
+                    </div>
+                </div>
+
+                <div id="edit-soal-${idx}" class="hidden space-y-3 pt-1">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span class="text-xs font-black text-amber-400"><i class="fa-solid fa-pen-to-square mr-1"></i> Edit Soal #${idx + 1}</span>
+                        <button onclick="toggleInlineEditSoal(${idx})" class="text-xs text-slate-400">Batal</button>
+                    </div>
+                    <textarea id="edit-input-soal-${idx}" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white">${item.soal}</textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="edit-input-a-${idx}" value="${item.opsi[0] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-b-${idx}" value="${item.opsi[1] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-c-${idx}" value="${item.opsi[2] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-d-${idx}" value="${item.opsi[3] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <select id="edit-input-kunci-${idx}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs font-bold text-white">
+                            <option value="0" ${item.jawaban_benar_index === 0 ? 'selected' : ''}>Kunci: Opsi A</option>
+                            <option value="1" ${item.jawaban_benar_index === 1 ? 'selected' : ''}>Kunci: Opsi B</option>
+                            <option value="2" ${item.jawaban_benar_index === 2 ? 'selected' : ''}>Kunci: Opsi C</option>
+                            <option value="3" ${item.jawaban_benar_index === 3 ? 'selected' : ''}>Kunci: Opsi D</option>
+                        </select>
+                        <button onclick="simpanInlineEditSoal(${idx})" class="bg-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs">Simpan</button>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function filterSoalModal() { renderDaftarSoalModal(); }
+
+function toggleInlineEditSoal(index) {
+    const viewDiv = document.getElementById(`view-soal-${index}`);
+    const editDiv = document.getElementById(`edit-soal-${index}`);
+    if (viewDiv && editDiv) {
+        viewDiv.classList.toggle('hidden');
+        editDiv.classList.toggle('hidden');
+    }
+}
+
+function simpanInlineEditSoal(index) {
+    const soal = document.getElementById(`edit-input-soal-${index}`).value.trim();
+    const a = document.getElementById(`edit-input-a-${index}`).value.trim();
+    const b = document.getElementById(`edit-input-b-${index}`).value.trim();
+    const c = document.getElementById(`edit-input-c-${index}`).value.trim();
+    const d = document.getElementById(`edit-input-d-${index}`).value.trim();
+    const kunci = parseInt(document.getElementById(`edit-input-kunci-${index}`).value);
+
+    if (!soal || !a || !b || !c || !d) return alert("Soal dan Opsi harus diisi lengkap!");
+
+    AppState.kuis.bankSoalManual[index] = { ...AppState.kuis.bankSoalManual[index], soal, opsi: [a, b, c, d], jawaban_benar_index: kunci };
+    if (typeof simpanKeLocalStorage === 'function') simpanKeLocalStorage();
+    renderDaftarSoalModal();
+}
+
+function hapusSoalDenganUndo(index) {
+    if (undoTimeoutId) clearTimeout(undoTimeoutId);
+    undoBufferSoal = { index: index, data: AppState.kuis.bankSoalManual[index] };
+    AppState.kuis.bankSoalManual.splice(index, 1);
+    if (typeof simpanKeLocalStorage === 'function') simpanKeLocalStorage();
+    renderDaftarSoalModal();
+
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.classList.remove('hidden');
+
+    undoTimeoutId = setTimeout(() => {
+        undoBufferSoal = null;
+        if (toast) toast.classList.add('hidden');
+    }, 5000);
+}
+
+function batalHapusSoalUndo() {
+    if (undoBufferSoal) {
+        AppState.kuis.bankSoalManual.splice(undoBufferSoal.index, 0, undoBufferSoal.data);
+        undoBufferSoal = null;
+        if (undoTimeoutId) clearTimeout(undoTimeoutId);
+        if (typeof simpanKeLocalStorage === 'function') simpanKeLocalStorage();
+        renderDaftarSoalModal();
+
+        const toast = document.getElementById('undo-toast');
+        if (toast) toast.classList.add('hidden');
+    }
+}
+
+function aturSkalaNama(element, teks) {
+    const panjang = teks.length;
+    const isDuel = (element.id === 'nama-kiri' || element.id === 'nama-kanan');
+
+    if (isDuel) {
+        if (panjang > 22) element.style.fontSize = '1.2rem';   
+        else if (panjang > 14) element.style.fontSize = '1.7rem';   
+        else element.style.fontSize = '2.4rem';   
+    } else {
+        if (panjang > 24) element.style.fontSize = '1.8rem';   
+        else if (panjang > 15) element.style.fontSize = '2.6rem';   
+        else element.style.fontSize = '3.6rem';   
+    }
+}
+
+function putarNamaAcak(element, daftarNama, durasi, namaPemenang, callback) {
+    let waktu = 0;
+    let interval = 60; 
+    const ctx = getAudioCtx();
+
+    let timer = setInterval(() => {
+        waktu += interval;
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(450, ctx.currentTime);
+                gain.gain.setValueAtTime(0.03, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.05);
+            } catch(e) {}
+        }
+        
+        let acak = daftarNama[Math.floor(Math.random() * daftarNama.length)];
+        aturSkalaNama(element, acak);
+        element.innerText = acak;
+        
+        if (waktu >= durasi) {
+            clearInterval(timer);
+            aturSkalaNama(element, namaPemenang);
+            element.innerText = namaPemenang;
+            element.style.color = '#fbbf24'; 
+            element.style.transform = 'scale(1.05)';
+            element.style.transition = 'all 0.3s ease';
+            if (callback) callback();
+        }
+    }, interval);
+}
+
+function eksekusiUndianMewah(mode, pemenang1, pemenang2 = null, daftarSemuaSiswa = []) {
+    if (!daftarSemuaSiswa || daftarSemuaSiswa.length === 0) {
+        daftarSemuaSiswa = ["AGUS", "BUDI", "CITRA", "DEWI", "EKO", "FAJAR", "GITA", "HADI", "INTAN"];
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'layar-undian-v2';
+    overlay.className = 'fixed inset-0 z-[9999] bg-slate-950/95 flex items-center justify-center backdrop-blur-md transition-opacity';
+    
+    if (mode === 'single') {
+        overlay.innerHTML = `
+            <div class="text-center relative px-6 w-full max-w-4xl mx-auto">
+                <h2 class="text-amber-400 font-black text-xl lg:text-2xl mb-8 tracking-widest uppercase animate-pulse">Mencari Pemain...</h2>
+                <div class="w-full bg-gradient-to-br from-indigo-600 to-purple-900 border-4 border-indigo-400 px-8 py-8 rounded-3xl shadow-[0_0_50px_rgba(79,70,229,0.5)] flex items-center justify-center min-h-[160px]">
+                    <div id="nama-slot" class="font-black text-white w-full uppercase tracking-wider text-center break-words leading-tight" style="text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">
+                        ???
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const elNama = document.getElementById('nama-slot');
+        aturSkalaNama(elNama, "???");
+        
+        putarNamaAcak(elNama, daftarSemuaSiswa, 3000, pemenang1, () => {
+            playSoundEffect('terpilih'); 
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } }); 
+            setTimeout(() => tampilkanTombolKonfirmasiUndian(overlay, 'single'), 1000); 
+        });
+
+    } else if (mode === 'duel') {
+        overlay.innerHTML = `
+            <div id="arena-clash" class="w-full max-w-7xl mx-auto h-full flex items-center justify-between px-4 lg:px-12 relative overflow-hidden">
+                <div class="flex-1 flex justify-end">
+                    <div id="kartu-kiri" class="w-full max-w-md bg-gradient-to-br from-blue-700 to-cyan-900 border-4 border-blue-400 rounded-3xl p-6 lg:p-8 text-center shadow-[0_0_50px_rgba(37,99,235,0.6)] opacity-0 flex flex-col justify-center min-h-[190px]" style="animation: clashLeft 0.8s ease-out forwards;">
+                        <h3 class="text-blue-300 font-black text-lg lg:text-xl mb-4 tracking-widest">SUDUT BIRU</h3>
+                        <div id="nama-kiri" class="font-black text-white uppercase tracking-wider break-words leading-tight">???</div>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0 flex items-center justify-center z-50 mx-4 lg:mx-8">
+                    <div id="logo-vs" class="pr-4 text-7xl lg:text-8xl font-black text-red-500 italic ... drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] opacity-0" style="text-shadow: 4px 4px 0px #fff; animation: pulseVs 0.5s ease-out 0.8s forwards;">
+                        VS
+                    </div>
+                </div>
+
+                <div class="flex-1 flex justify-start">
+                    <div id="kartu-kanan" class="w-full max-w-md bg-gradient-to-br from-red-700 to-rose-900 border-4 border-red-400 rounded-3xl p-6 lg:p-8 text-center shadow-[0_0_50px_rgba(225,29,72,0.6)] opacity-0 flex flex-col justify-center min-h-[190px]" style="animation: clashRight 0.8s ease-out forwards;">
+                        <h3 class="text-red-300 font-black text-lg lg:text-xl mb-4 tracking-widest">SUDUT MERAH</h3>
+                        <div id="nama-kanan" class="font-black text-white uppercase tracking-wider break-words leading-tight">???</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const arena = document.getElementById('arena-clash');
+        
+        setTimeout(() => {
+            arena.style.animation = 'clashShake 0.5s ease-in-out';
+        }, 800);
+
+        setTimeout(() => {
+            const elKiri = document.getElementById('nama-kiri');
+            const elKanan = document.getElementById('nama-kanan');
+            
+            putarNamaAcak(elKiri, daftarSemuaSiswa, 3500, pemenang1);
+            putarNamaAcak(elKanan, daftarSemuaSiswa, 3500, pemenang2, () => {
+                playSoundEffect('terpilih'); 
+                confetti({ particleCount: 200, spread: 150, origin: { y: 0.5 } }); 
+                setTimeout(() => tampilkanTombolKonfirmasiUndian(overlay, 'duel'), 1000); 
+            });
+        }, 1000);
+    }
+}
+
+function tampilkanTombolKonfirmasiUndian(overlay, mode) {
+    const btnBox = document.createElement('div');
+    btnBox.className = 'absolute bottom-10 lg:bottom-16 left-1/2 transform -translate-x-1/2 flex flex-col sm:flex-row gap-4 z-[99999] fade-in';
+    btnBox.innerHTML = `
+        <button onclick="aksiUndianSelesai('${mode}', 'ulang')" class="bg-slate-900/80 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/50 font-black py-3.5 px-8 rounded-2xl shadow-xl transition-all hover:scale-105 flex items-center justify-center">
+            <i class="fa-solid fa-rotate-right mr-2 text-lg"></i> Undi Ulang
+        </button>
+        <button onclick="aksiUndianSelesai('${mode}', 'lanjut')" class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-3.5 px-10 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-400/50 transition-all hover:scale-105 flex items-center justify-center">
+            <i class="fa-solid fa-play mr-2 text-lg"></i> Lanjut Kuis
+        </button>
+    `;
+    overlay.appendChild(btnBox);
+}
+
+function aksiUndianSelesai(mode, aksi) {
+    const overlay = document.getElementById('layar-undian-v2');
+    if (overlay) overlay.remove();
+
+    if (aksi === 'lanjut') {
+        mulaiHitungMundur(mode === 'single' ? 3 : 5);
+    } else {
+        if (mode === 'single' && AppState.kuis.siswaTelahMainSingle.length > 0) {
+            AppState.kuis.siswaTelahMainSingle.pop();
+            undiPemainSpin(); 
+        } else if (mode === 'duel' && AppState.kuis.siswaTelahMainDuel.length > 1) {
+            AppState.kuis.siswaTelahMainDuel.pop();
+            AppState.kuis.siswaTelahMainDuel.pop();
+            undiPemainDuelSpin(); 
+        }
+    }
+}
+
+function mulaiHitungMundur(detikTunggu) {
+    const overlayCount = document.createElement('div');
+    overlayCount.id = 'layar-hitung-mundur';
+    overlayCount.className = 'fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center transition-all duration-300';
+    
+    overlayCount.innerHTML = `
+        <h2 class="text-slate-400 font-bold text-xl uppercase tracking-[0.3em] mb-8">Persiapan Kuis</h2>
+        <div id="angka-mundur" class="text-[12rem] lg:text-[18rem] font-black text-amber-500 leading-none" style="text-shadow: 0 0 25px rgba(245,158,11,0.4);">
+            ${detikTunggu}
+        </div>
+    `;
+    document.body.appendChild(overlayCount);
+
+    const angkaEl = document.getElementById('angka-mundur');
+    let sisaDetik = detikTunggu;
+    const ctx = getAudioCtx(); 
+
+    function playBeepShort() {
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            } catch(e) {}
+        }
+    }
+
+    function playBeepLong() {
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(800, ctx.currentTime); 
+                gain.gain.setValueAtTime(0.8, ctx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8); 
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.8);
+            } catch(e) {}
+        }
+    }
+
+    playBeepShort(); 
+
+    let timerMundur = setInterval(() => {
+        sisaDetik--;
+        
+        if (sisaDetik > 0) {
+            angkaEl.innerText = sisaDetik;
+            angkaEl.style.transform = 'scale(1.2)';
+            setTimeout(() => angkaEl.style.transform = 'scale(1)', 150);
+            playBeepShort();
+            
+        } else {
+            clearInterval(timerMundur);
+            
+            overlayCount.style.background = "#020617"; 
+            
+            angkaEl.innerText = "MULAI!";
+            angkaEl.className = "text-[6rem] lg:text-[10rem] font-black text-emerald-500 tracking-widest";
+            
+            angkaEl.style.textShadow = "0 0 35px rgba(16,185,129,0.5)"; 
+            
+            playBeepLong();
+
+            setTimeout(() => {
+                overlayCount.remove();
+                mulaiKuisSebenarnya(); 
+            }, 800);
+        }
+    }, 1000);
+}
+
+const mapelObserverTarget = document.getElementById('mapel-select');
+if (mapelObserverTarget) {
+    mapelObserverTarget.addEventListener('change', function() {
+        if (this.value) {
+            localStorage.setItem('saved_mapel_teacher', this.value);
+        }
+    });
+
+    const observer = new MutationObserver(() => {
+        const savedMapel = localStorage.getItem('saved_mapel_teacher');
+        if (savedMapel && mapelObserverTarget.value !== savedMapel) {
+            const optionAda = Array.from(mapelObserverTarget.options).some(opt => opt.value === savedMapel);
+            if (optionAda) {
+                mapelObserverTarget.value = savedMapel;
+                mapelObserverTarget.dispatchEvent(new Event('change')); 
+            }
+        }
+    });
+    observer.observe(mapelObserverTarget, { childList: true, subtree: true });
+}
+
+function downloadTemplateSoalExcel() {
+    const headers = ['Pertanyaan Soal', 'Pilihan A', 'Pilihan B', 'Pilihan C', 'Pilihan D', 'Kunci (A/B/C/D)'];
+    const sample1 = ['Siapa presiden pertama Indonesia?', 'Soeharto', 'B.J. Habibie', 'Ir. Soekarno', 'Joko Widodo', 'C'];
+    const sample2 = ['Apa ibu kota provinsi Jawa Timur?', 'Malang', 'Surabaya', 'Sidoarjo', 'Bangkalan', 'B'];
+    
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, sample1, sample2]);
+    
+    worksheet['!cols'] = [{ wch: 50 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template_Soal");
+
+    XLSX.writeFile(workbook, "Template_Soal_SmartTeacher.xlsx");
+}
+
+const fabContainer = document.getElementById('fab-container');
+const dragHandle = document.getElementById('fab-drag-handle');
+
+let isDraggingFab = false;
+let currentX, currentY, initialX, initialY;
+let xOffset = 0, yOffset = 0;
+
+function dragStartFab(e) {
+    if (e.type === "touchstart") {
+        initialX = e.touches[0].clientX - xOffset;
+        initialY = e.touches[0].clientY - yOffset;
+    } else {
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+    }
+    if (e.target === dragHandle || (dragHandle && dragHandle.contains(e.target))) {
+        isDraggingFab = true;
+    }
+}
+
+function dragEndFab(e) {
+    initialX = currentX;
+    initialY = currentY;
+    isDraggingFab = false;
+}
+
+function dragFab(e) {
+    if (isDraggingFab && fabContainer) {
+        e.preventDefault(); 
+        if (e.type === "touchmove") {
+            currentX = e.touches[0].clientX - initialX;
+            currentY = e.touches[0].clientY - initialY;
+        } else {
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+        }
+        xOffset = currentX;
+        yOffset = currentY;
+        fabContainer.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+    }
+}
+
+if (fabContainer && dragHandle) {
+    fabContainer.addEventListener("touchstart", dragStartFab, { passive: false });
+    fabContainer.addEventListener("touchend", dragEndFab, { passive: false });
+    fabContainer.addEventListener("touchmove", dragFab, { passive: false });
+    fabContainer.addEventListener("mousedown", dragStartFab);
+    document.addEventListener("mouseup", dragEndFab);
+    document.addEventListener("mousemove", dragFab);
+}
+
+function toggleEdgePanel() {
+    const panel = document.getElementById('edge-panel');
+    const icon = document.getElementById('edge-icon');
+    
+    if (panel.classList.contains('translate-x-full')) {
+        panel.classList.remove('translate-x-full');
+        panel.classList.add('translate-x-0');
+        icon.style.transform = 'rotate(180deg)'; 
+    } else {
+        panel.classList.remove('translate-x-0');
+        panel.classList.add('translate-x-full');
+        icon.style.transform = 'rotate(0deg)'; 
+    }
+}
+
+if (!AppState.ui.psTab) AppState.ui.psTab = 'create';
+if (!AppState.db.prompts) AppState.db.prompts = [];
+
+function gantiTabPS(tabName) {
+    AppState.ui.psTab = tabName;
+    renderPresentationStudio(document.getElementById('main-content'));
+}
+
+function renderPresentationStudio(container) {
+    const activeTab = AppState.ui.psTab || 'create';
+    
+    let content = `
+        <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 lg:p-8 max-w-5xl mx-auto fade-in">
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="text-xl lg:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                    <i class="fa-solid fa-person-chalkboard text-emerald-500 mr-2.5"></i>SMART TEACHER — PRESENTATION STUDIO
+                </h3>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                Buat prompt presentasi pembelajaran yang menarik, menyenangkan, interaktif, dan sesuai kebutuhan siswa.
+            </p>
+
+            <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2 mb-6 bg-slate-50 dark:bg-slate-800 p-2 rounded-2xl border border-slate-100 dark:border-slate-700">
+                <button onclick="gantiTabPS('create')" class="flex-1 py-2.5 px-3 rounded-xl font-bold transition-all text-xs ${activeTab==='create'?'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm':'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Buat Prompt Baru
+                </button>
+                <button onclick="gantiTabPS('collection')" class="flex-1 py-2.5 px-3 rounded-xl font-bold transition-all text-xs ${activeTab==='collection'?'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm':'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}">
+                    <i class="fa-solid fa-book-bookmark mr-1.5"></i> Koleksi Tersimpan (${AppState.db.prompts?.length || 0})
+                </button>
+            </div>
+    `;
+
+    if (activeTab === 'create') {
+        content += `
+            <div class="space-y-6">
+                <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-sm mb-4 flex items-center">
+                        <i class="fa-solid fa-school text-emerald-500 mr-2"></i>1. Identitas Pembelajaran
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Jenjang Pendidikan *</label>
+                            <select id="ps-jenjang" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="SD">SD</option>
+                                <option value="MI">MI</option>
+                                <option value="SMP">SMP</option>
+                                <option value="MTs">MTs</option>
+                                <option value="SMA">SMA</option>
+                                <option value="SMK">SMK</option>
+                                <option value="MA">MA</option>
+                                <option value="PAUD/TK">PAUD/TK</option>
+                                <option value="Lainnya">Lainnya (Kustom)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Kelas *</label>
+                            <input type="text" id="ps-kelas" placeholder="Contoh: Kelas 6 / Fase C" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Mata Pelajaran *</label>
+                            <input type="text" id="ps-mapel" placeholder="Contoh: Ilmu Pengetahuan Alam (IPA)" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Kurikulum</label>
+                            <select id="ps-kurikulum" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="Kurikulum Merdeka">Kurikulum Merdeka</option>
+                                <option value="Kurikulum 2013">Kurikulum 2013</option>
+                                <option value="Umum">Umum / Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Bahasa Presentasi</label>
+                            <select id="ps-bahasa" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="Indonesia Ramah & Menyenangkan">Indonesia Ramah & Menyenangkan</option>
+                                <option value="Indonesia Formal">Indonesia Formal (Baku)</option>
+                                <option value="Inggris (Bilingual)">Inggris (Bilingual)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-sm mb-4 flex items-center">
+                        <i class="fa-solid fa-book-open text-emerald-500 mr-2"></i>2. Substansi Materi
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Materi Utama *</label>
+                            <input type="text" id="ps-materi" placeholder="Contoh: Tata Surya" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white font-bold text-emerald-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Submateri</label>
+                            <input type="text" id="ps-submateri" placeholder="Contoh: Karakteristik Planet Dalam & Luar" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Tujuan Pembelajaran *</label>
+                        <textarea id="ps-tujuan" rows="2" placeholder="Siswa dapat mengidentifikasi nama planet dan karakteristiknya..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white custom-scrollbar"></textarea>
+                    </div>
+                </div>
+
+                <div class="p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-sm mb-4 flex items-center">
+                        <i class="fa-solid fa-palette text-emerald-500 mr-2"></i>3. Konsep Visual & Pembelajaran
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Gaya Visual Desain *</label>
+                            <select id="ps-visual" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm outline-none dark:text-white cursor-pointer">
+                                <option value="3D Clay Animation (Lucu, bertekstur plastisin lembut, warna cerah)">3D Clay Animation (Plastisin Lembut)</option>
+                                <option value="Pop-Up Book (Elemen 3D muncul dari lipatan kertas)">Pop-Up Book (Kertas Lipat 3D)</option>
+                                <option value="Game Adventure (Desain level permainan, elemen RPG)">Game Adventure (Tema RPG/Petualangan)</option>
+                                <option value="Detective Learning (Misteri, monokrom/kaca pembesar)">Detective Learning (Tema Misteri)</option>
+                                <option value="Storytelling (Ilustrasi buku cerita tangan/watercolor)">Storytelling (Buku Cerita)</option>
+                                <option value="Virtual Field Trip (Latar realistis/fotografi lapangan)">Virtual Field Trip (Tur Virtual)</option>
+                                <option value="Cinematic Presentation (Gelap dramatis, elegan)">Cinematic Presentation (Dramatis)</option>
+                                <option value="Infografis Modern (Clean, flat design, diagram data)">Infografis Modern (Data Visual)</option>
+                                <option value="Kartun Edukasi (Vektor 2D cerah, outline tegas)">Kartun Edukasi (Vektor 2D)</option>
+                                <option value="Minimalis Profesional (Bersih, elegan, font tebal)">Minimalis Profesional</option>
+                                <option value="Gaya Kustom Bebas (Sesuaikan dengan AI)">Gaya Kustom</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Model Pembelajaran</label>
+                            <select id="ps-model" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm outline-none dark:text-white cursor-pointer">
+                                <option value="Discovery Learning (Mencari dan Menemukan)">Discovery Learning</option>
+                                <option value="Project Based Learning (PjBL)">Project Based Learning (PjBL)</option>
+                                <option value="Problem Based Learning (PBL)">Problem Based Learning (PBL)</option>
+                                <option value="Game-Based Learning (Bermain Sambil Belajar)">Game-Based Learning</option>
+                                <option value="Kontekstual (CTL)">Kontekstual (CTL)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label class="block text-xs font-bold text-slate-500 mb-2">Jenis Aktivitas Interaktif (Bisa pilih lebih dari satu):</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-5">
+                        ${['Tebak gambar', 'Mencocokkan pasangan', 'Permainan edukatif', 'Diskusi kelompok', 'Studi kasus', 'Eksperimen sederhana', 'Latihan soal', 'Refleksi pembelajaran'].map(act => `
+                            <label class="inline-flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors">
+                                <input type="checkbox" name="ps-aktivitas" value="${act}" class="w-4 h-4 accent-emerald-600 rounded">
+                                <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300">${act}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Bentuk Evaluasi</label>
+                            <select id="ps-evaluasi" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="Kuis pilihan ganda">Kuis Pilihan Ganda</option>
+                                <option value="Benar atau salah">Benar atau Salah</option>
+                                <option value="Isian singkat">Isian Singkat</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Target Jumlah Slide</label>
+                            <select id="ps-slide" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="Otomatis (Dinamis menyesuaikan materi)">Otomatis (Dinamis)</option>
+                                <option value="Tepat 7 Slide">7 Slide</option>
+                                <option value="Tepat 10 Slide">10 Slide</option>
+                                <option value="Tepat 15 Slide">15 Slide</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Platform Tujuan</label>
+                            <select id="ps-platform" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none dark:text-white">
+                                <option value="Canva AI (Magic Design)">Canva AI (Magic Design)</option>
+                                <option value="Gamma App (gamma.app - AI Generator)">Gamma App (AI Otomatis - Gratis & Banyak Kuota)</option>
+                                <option value="Microsoft PowerPoint / Copilot (Akun belajar.id)">Microsoft PowerPoint / Copilot (Resmi Belajar.id)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="generatePSPrompt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-600/30 transition-transform hover:scale-[1.01] flex items-center justify-center text-base">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-2.5 text-lg"></i> BUAT PROMPT
+                </button>
+
+                <div id="ps-result-area" class="hidden mt-8 border-t border-slate-200 dark:border-slate-700 pt-6 fade-in">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-black text-slate-800 dark:text-white flex items-center text-sm uppercase">
+                            <i class="fa-solid fa-code text-emerald-500 mr-2"></i>Hasil Prompt Tersusun
+                        </h4>
+                    </div>
+                    
+                    <textarea id="ps-output-text" class="w-full h-80 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-xs font-mono text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-emerald-500 custom-scrollbar mb-4 whitespace-pre-wrap"></textarea>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        <button onclick="salinPSPrompt()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs shadow-sm col-span-2 md:col-span-1">
+                            <i class="fa-regular fa-copy mr-1.5"></i> SALIN PROMPT
+                        </button>
+                        <button onclick="editPSPrompt()" class="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl text-xs shadow-sm">
+                            <i class="fa-solid fa-pen-to-square mr-1.5"></i> EDIT PROMPT
+                        </button>
+                        <button onclick="generatePSPrompt()" class="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl text-xs shadow-sm">
+                            <i class="fa-solid fa-rotate mr-1.5"></i> BUAT ULANG
+                        </button>
+                        <button onclick="simpanPSPrompt()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs shadow-sm">
+                            <i class="fa-solid fa-bookmark mr-1.5"></i> SIMPAN KOLEKSI
+                        </button>
+                        <button id="ps-btn-buka" onclick="bukaPlatformTujuan()" class="font-bold py-3 rounded-xl text-xs shadow-sm text-white transition-all col-span-2 md:col-span-1 flex items-center justify-center bg-gradient-to-r from-cyan-500 to-blue-600">
+                            <i class="fa-solid fa-arrow-up-right-from-square mr-1.5"></i> <span id="ps-btn-buka-text">BUKA PLATFORM TUJUAN</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        const listPrompts = AppState.db.prompts || [];
+        let searchVal = (document.getElementById('ps-search')?.value || '').toLowerCase();
+        let filtered = listPrompts.filter(p => p.judul.toLowerCase().includes(searchVal) || p.mapel.toLowerCase().includes(searchVal));
+
+        let rowHtml = '';
+        if (filtered.length === 0) {
+            rowHtml = `<div class="text-center py-12 text-slate-400 text-xs font-bold border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">Belum ada prompt tersimpan yang sesuai.</div>`;
+        } else {
+            rowHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">` + filtered.map(p => `
+                <div class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 relative group transition-all hover:border-emerald-400">
+                    <button onclick="hapusPSPrompt('${p.id}')" class="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
+                    <span class="text-[10px] bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider">${p.mapel}</span>
+                    <h4 class="font-bold text-slate-800 dark:text-white mt-3 text-sm leading-tight">${p.judul}</h4>
+                    <p class="text-[11px] text-slate-400 mt-1 mb-4 truncate">${p.kelas} • ${p.tanggal}</p>
+                    <div class="flex gap-2">
+                        <button onclick="lihatPSPrompt('${p.id}')" class="flex-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 font-bold py-2 rounded-xl text-xs transition-colors"><i class="fa-solid fa-folder-open mr-1"></i> Buka</button>
+                        <button onclick="salinTeksCepat('${p.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs transition-colors"><i class="fa-regular fa-copy mr-1"></i> Salin</button>
+                    </div>
+                    <textarea id="hidden-prompt-${p.id}" class="hidden">${escapeHTML(p.promptTeks)}</textarea>
+                </div>
+            `).join('') + `</div>`;
+        }
+
+        content += `
+            <div class="space-y-4 fade-in">
+                <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
+                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-sm"><i class="fa-solid fa-box-archive mr-2"></i>Daftar Koleksi Anda</h4>
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="ps-search" placeholder="Cari Mapel / Materi..." oninput="renderPresentationStudio(document.getElementById('main-content'))" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-emerald-500 dark:text-white" value="${searchVal}">
+                    </div>
+                </div>
+                ${rowHtml}
+            </div>
+        `;
+    }
+
+    content += `</div>`;
+    container.innerHTML = content;
+}
+
+function generatePSPrompt() {
+    const jenjang = document.getElementById('ps-jenjang').value;
+    const kelas = document.getElementById('ps-kelas').value.trim();
+    const mapel = document.getElementById('ps-mapel').value.trim();
+    const materi = document.getElementById('ps-materi').value.trim();
+    const submateri = document.getElementById('ps-submateri').value.trim();
+    const tujuan = document.getElementById('ps-tujuan').value.trim();
+    
+    if (!kelas || !mapel || !materi || !tujuan) {
+        return showAlert('Peringatan', 'Harap lengkapi kolom wajib: Kelas, Mata Pelajaran, Materi Utama, dan Tujuan Pembelajaran!', 'error');
+    }
+
+    const cbs = document.querySelectorAll('input[name="ps-aktivitas"]:checked');
+    const aktivitasStr = cbs.length > 0 ? Array.from(cbs).map(cb => cb.value).join(', ') : 'Tanpa aktivitas khusus';
+
+    const megaPrompt = `Buatkan desain presentasi pembelajaran secara utuh dan terstruktur yang ditujukan untuk Canva AI (Magic Design) dengan spesifikasi detail berikut:
+
+A. IDENTITAS PEMBELAJARAN
+- Jenjang Pendidikan: ${jenjang}
+- Kelas / Fase: ${kelas}
+- Mata Pelajaran: ${mapel}
+- Materi Utama: ${materi}
+${submateri ? '- Submateri: ' + submateri : ''}
+- Kurikulum: ${document.getElementById('ps-kurikulum').value}
+- Bahasa Presentasi: ${document.getElementById('ps-bahasa').value}
+
+B. TUJUAN PEMBELAJARAN & PROFIL SISWA
+- Tujuan Pembelajaran: ${tujuan}
+- Profil Siswa: Sesuaikan tingkat kedalaman materi, bahasa, logika, dan contoh konkret agar mudah dicerna, menarik, dan relevan dengan dunia siswa jenjang ${jenjang} kelas ${kelas}.
+
+C. ARAHAN KONSEP VISUAL & DESAIN (${document.getElementById('ps-platform').value})
+- Gaya Visual Dominan: ${document.getElementById('ps-visual').value}
+- Instruksi Desain: Jaga konsistensi palet warna, karakter, dan elemen ilustrasi antar slide. Hindari penggunaan teks yang terlalu padat (bullet points). Maksimalkan ruang kosong (white space) dan visualisasi.
+
+D. STRUKTUR PRESENTASI (${document.getElementById('ps-slide').value})
+Susun urutan presentasi menggunakan Model Pembelajaran "${document.getElementById('ps-model').value}" secara sistematis:
+1. Halaman Sampul (Judul besar, identitas, dan deskripsi ilustrasi utama).
+2. Sapaan Awal & Tujuan Pembelajaran (Ramah, jelas, poin-poin ringkas).
+3. Apersepsi / Pertanyaan Pemantik (Mengaitkan materi dengan pengalaman nyata siswa sehari-hari).
+4. Materi Inti (Bagi menjadi beberapa slide yang berkesinambungan, fokus pada poin gagasan pokok).
+5. Contoh Konkret / Studi Kasus Nyata.
+6. Aktivitas Siswa: ${aktivitasStr}.
+7. Rangkuman & Refleksi Pembelajaran.
+8. Evaluasi Formatif: ${document.getElementById('ps-evaluasi').value}. (Sediakan soal tanpa kunci jawaban di slide siswa).
+9. Penutup & Kalimat Motivasi.
+10. Kunci Jawaban Terpisah (Sediakan khusus di slide terakhir sebagai pegangan Guru).
+
+E. KETENTUAN MUTLAK KONTEN (PENTING)
+- JANGAN pernah mengarang fakta, rumus, definisi pakem, hukum sains, dalil, kutipan sejarah, atau aturan kurikulum. 
+- Jika ada informasi atau data spesifik yang di-generate AI dan membutuhkan validasi, berikan penanda teks "[VERIFIKASI GURU]" di akhir kalimat tersebut.
+- Fokuskan output Anda untuk menjadi teks kerangka presentasi (Outline) yang langsung rapi ketika disalin ke Canva.`;
+
+    const outputEl = document.getElementById('ps-output-text');
+    const areaEl = document.getElementById('ps-result-area');
+    
+    outputEl.value = megaPrompt;
+    outputEl.readOnly = true;
+    areaEl.classList.remove('hidden');
+    
+    setTimeout(() => areaEl.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100);
+    updateTombolPlatformUI();
+}
+
+function salinPSPrompt() {
+    const teks = document.getElementById('ps-output-text').value;
+    salinTeksAsli(teks);
+}
+
+function salinTeksCepat(id) {
+    const teks = document.getElementById(`hidden-prompt-${id}`).value;
+    salinTeksAsli(teks);
+}
+
+function salinTeksAsli(teks) {
+    if (!teks) return;
+    try {
+        const ta = document.createElement("textarea");
+        ta.value = teks;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showAlert("Disalin!", "Teks prompt berhasil disalin. Silakan paste ke Canva AI.", "success");
+    } catch (err) {
+        prompt("Sistem memblokir copy otomatis. Silakan salin manual teks di bawah ini:", teks);
+    }
+}
+
+function editPSPrompt() {
+    const outputEl = document.getElementById('ps-output-text');
+    outputEl.readOnly = false;
+    outputEl.focus();
+    showAlert("Mode Edit Aktif", "Silakan ubah teks prompt langsung di kotak hasil. Jangan lupa salin atau simpan setelah selesai mengedit.", "info");
+}
+
+function simpanPSPrompt() {
+    const mapel = document.getElementById('ps-mapel')?.value.trim() || 'Umum';
+    const materi = document.getElementById('ps-materi')?.value.trim() || 'Materi Presentasi';
+    const kelas = document.getElementById('ps-kelas')?.value.trim() || '-';
+    const teks = document.getElementById('ps-output-text').value.trim();
+    
+    if(!teks) return showAlert("Gagal", "Prompt masih kosong, tidak ada yang bisa disimpan.", "error");
+
+    if(!AppState.db.prompts) AppState.db.prompts = [];
+    
+    AppState.db.prompts.unshift({
+        id: generateId(),
+        judul: materi,
+        mapel: mapel,
+        kelas: kelas,
+        promptTeks: teks,
+        tanggal: new Date().toLocaleDateString('id-ID')
+    });
+    
+    saveDatabase();
+    showAlert("Tersimpan!", "Prompt telah berhasil disimpan ke Koleksi Presentation Studio.", "success");
+}
+
+function hapusPSPrompt(id) {
+    if(confirm('Yakin ingin menghapus prompt ini dari koleksi?')) {
+        AppState.db.prompts = AppState.db.prompts.filter(p => p.id !== id);
+        saveDatabase();
+        gantiTabPS('collection');
+    }
+}
+
+function lihatPSPrompt(id) {
+    const p = AppState.db.prompts.find(x => x.id === id);
+    if(p) {
+        gantiTabPS('create');
+        setTimeout(() => {
+            const area = document.getElementById('ps-result-area');
+            const ta = document.getElementById('ps-output-text');
+            if(area && ta) {
+                area.classList.remove('hidden');
+                ta.value = p.promptTeks;
+            }
+        }, 100);
+    }
+}
+
+function bukaPlatformTujuan() {
+    const platform = document.getElementById('ps-platform').value;
+    
+    if (platform.includes('Gamma')) {
+        window.open('https://gamma.app/', '_blank');
+    } else if (platform.includes('Microsoft') || platform.includes('belajar.id')) {
+        window.open('https://www.office.com/', '_blank');
+    } else {
+        window.open('https://www.canva.com/magic', '_blank');
+    }
+}
+
+function updateTombolPlatformUI() {
+    const platform = document.getElementById('ps-platform').value;
+    const btnEl = document.getElementById('ps-btn-buka');
+    const textEl = document.getElementById('ps-btn-buka-text');
+    
+    if (!btnEl || !textEl) return;
+
+    btnEl.className = "font-bold py-3 rounded-xl text-xs shadow-sm text-white transition-all col-span-2 md:col-span-1 flex items-center justify-center";
+
+    if (platform.includes('Gamma')) {
+        textEl.innerText = "BUKA GAMMA APP";
+        btnEl.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-indigo-600', 'hover:from-purple-500', 'hover:to-indigo-500');
+    } else if (platform.includes('Microsoft') || platform.includes('belajar.id')) {
+        textEl.innerText = "BUKA MICROSOFT";
+        btnEl.classList.add('bg-gradient-to-r', 'from-blue-700', 'to-sky-600', 'hover:from-blue-600', 'hover:to-sky-500');
+    } else {
+        textEl.innerText = "BUKA CANVA AI";
+        btnEl.classList.add('bg-gradient-to-r', 'from-cyan-500', 'to-blue-600', 'hover:from-cyan-400', 'hover:to-blue-500');
+    }
+}
+
+function lihatQRSiswa(id) {
+    const siswa = AppState.db.siswa.find(s => s.id === id);
+    if(!siswa) return;
+    
+    const kelasSiswa = AppState.db.kelas.find(k => k.id === siswa.kelasId || k.kode === siswa.kelasId);
+    const namaKelas = kelasSiswa ? kelasSiswa.kode : (siswa.kelasId || "-");
+    const targetData = `${siswa.nis || siswa.id}|${siswa.nama}|${namaKelas}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(targetData)}&margin=10`;
+
+    const modalHtml = `
+    <div id="qr-modal-tampil" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-all fade-in">
+        <style>
+            @media print {
+                body * { visibility: hidden; }
+                #qr-modal-tampil, #qr-modal-tampil * { visibility: visible; }
+                #qr-modal-tampil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: flex-start; justify-content: center; padding-top: 2rem; background: white !important; }
+                .qr-no-print { display: none !important; }
+            }
+        </style>
+        
+        <div class="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-2xl w-full max-w-sm text-center relative border border-slate-200 dark:border-slate-800">
+            <button onclick="document.getElementById('qr-modal-tampil').remove()" class="qr-no-print absolute top-4 right-4 w-9 h-9 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-500 rounded-xl flex items-center justify-center font-bold transition-all"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="qr-no-print w-12 h-12 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-inner"><i class="fa-solid fa-id-badge"></i></div>
+            
+            <h3 class="text-xl font-black text-slate-800 dark:text-white mb-1">Kartu Pelajar Digital</h3>
+            <p class="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-6">${siswa.nama} <br><span class="text-xs text-slate-500 dark:text-slate-400">NIS: ${siswa.nis || 'Belum diatur'}</span></p>
+            
+            <div class="bg-white p-3 rounded-2xl shadow-sm border-2 border-dashed border-slate-300 inline-block mb-6 relative group">
+                <img src="${qrUrl}" alt="QR Code ${siswa.nama}" class="w-48 h-48 object-contain">
+            </div>
+            
+            <p class="qr-no-print text-[11px] text-slate-500 mb-5 leading-relaxed">QR Code ini langsung terhubung dengan NIS siswa. Bisa digunakan untuk scan di <b>Smart Gateway</b>.</p>
+            <button onclick="window.print()" class="qr-no-print w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center"><i class="fa-solid fa-print mr-2"></i> Cetak Kartu QR</button>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function tarikDataGateway(kelasId) {
+    const activeWs = getActiveWorkspace();
+    const npsn = activeWs.npsn;
+
+    if (!npsn) {
+        return showAlert("NPSN Kosong", "Kode Sekolah / NPSN untuk ruang kerja '" + activeWs.nama + "' belum diatur. Silakan buat/edit ruang kerjanya.", "error");
+    }
+
+    const tgl = new Date();
+    const tglStr = tgl.getFullYear() + "-" + String(tgl.getMonth() + 1).padStart(2, '0') + "-" + String(tgl.getDate()).padStart(2, '0');
+
+    const btn = document.getElementById('btn-tarik-gateway');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Sedang Menarik Data...';
+    btn.disabled = true;
+
+    try {
+        const urlTarik = `${URL_GATEWAY_PUSAT}?action=getLogs&npsn=${encodeURIComponent(npsn)}&tanggal=${encodeURIComponent(tglStr)}`;
+        const response = await fetch(urlTarik);
+        const textResponse = await response.text(); 
+        
+        let jsonResponse;
+        try {
+            jsonResponse = JSON.parse(textResponse);
+        } catch (err) {
+            throw new Error("Server membalas dengan format salah: " + textResponse.substring(0, 50) + "...");
+        }
+
+        if (jsonResponse.status !== "sukses") {
+            throw new Error(jsonResponse.pesan || "Gagal mengambil data dari server pusat.");
+        }
+
+        const dataGateway = jsonResponse.data || []; 
+        let hitungBerhasil = 0;
+        const siswaKelas = AppState.db.siswa.filter(s => s.kelasId === kelasId);
+            
+        dataGateway.forEach(absenGerbang => {
+            if (absenGerbang.nis && absenGerbang.tanggal) {
+                const siswaMatch = siswaKelas.find(s => String(s.nis) === String(absenGerbang.nis));
+                
+                if (siswaMatch) {
+                    const idx = AppState.db.absensi.findIndex(a => 
+                        a.siswaId === siswaMatch.id && 
+                        a.tanggal === absenGerbang.tanggal && 
+                        a.kelasId === kelasId
+                    );
+                    
+                    if (idx >= 0) {
+                        if (AppState.db.absensi[idx].status !== 'H') {
+                            AppState.db.absensi[idx].status = 'H';
+                            hitungBerhasil++;
+                        }
+                    } else {
+                        AppState.db.absensi.push({
+                            id: generateId(),
+                            siswaId: siswaMatch.id,
+                            kelasId: kelasId,
+                            tanggal: absenGerbang.tanggal,
+                            status: 'H'
+                        });
+                        hitungBerhasil++;
+                    }
+                }
+            }
+        });
+            
+        if (hitungBerhasil > 0) {
+            saveDatabase(); 
+            showAlert("Sinkronisasi Sukses!", `Berhasil menarik dan mencentang Hadir (H) untuk ${hitungBerhasil} siswa dari Smart Gateway!`, "success");
+        } else {
+            showAlert("Selesai", "Semua data sudah sinkron. Tidak ada kehadiran baru dari mesin gerbang untuk kelas ini.", "info");
+        }
+            
+    } catch (err) {
+        console.error(err);
+        showAlert("Koneksi Gagal", err.message, "error");
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        loadAbsensi(); 
+    }
+}
