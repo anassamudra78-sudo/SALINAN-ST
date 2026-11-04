@@ -435,6 +435,11 @@ function renderDashboard(container) {
         }).join('') + `</div>`;
     }
 
+    // --- DI SINI PERBAIKAN LINK GATEWAY-NYA ---
+    const activeWs = getActiveWorkspace();
+    const linkGateway = `https://anassamudra78-sudo.github.io/Gateway-Station/?npsn=${encodeURIComponent(activeWs.npsn || 'KOSONG')}&nama=${encodeURIComponent(activeWs.nama || 'Ruang_Kerja')}`;
+    // ------------------------------------------
+
     container.innerHTML = `
         <div class="space-y-5">
             <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 rounded-3xl p-6 lg:p-7 text-white shadow-lg flex flex-col md:flex-row justify-between items-center relative overflow-hidden">
@@ -487,6 +492,7 @@ function renderDashboard(container) {
                 </div>
             </div>
 
+            <!-- KARTU TOMBOL GATEWAY (LINK SUDAH DINAMIS) -->
             <div class="bg-slate-800/80 dark:bg-slate-900/80 border border-slate-700/60 rounded-2xl p-5 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg backdrop-blur-md">
                 <div class="flex items-center space-x-4">
                     <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center text-xl shrink-0">
@@ -497,7 +503,7 @@ function renderDashboard(container) {
                         <p class="text-xs text-slate-400">Pusat absensi modern berbasis Face Recognition & QR Code terintegrasi</p>
                     </div>
                 </div>
-                <a href="https://anassamudra78-sudo.github.io/Gateway-Station/" target="_blank" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-semibold text-xs flex items-center space-x-2 transition-all shadow-md shrink-0">
+                <a href="${linkGateway}" target="_blank" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-semibold text-xs flex items-center space-x-2 transition-all shadow-md shrink-0">
                     <span>Buka Gateway</span>
                     <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                 </a>
@@ -529,7 +535,6 @@ function renderDashboard(container) {
         }
     }, 1000);
 }
-
 function bukaPintasanKelas(targetTab, kelasId) {
     switchTab(targetTab);
     setTimeout(() => {
