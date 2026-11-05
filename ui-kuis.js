@@ -515,26 +515,42 @@ function undiPemainDuelSpin() {
     if (!klsId) return showAlert('Peringatan', 'Pilih kelas terlebih dahulu!');
 
     const listSiswa = AppState.db.siswa.filter(s => s.kelasId === klsId);
-    if (listSiswa.length < 2) return showAlert('Peringatan', 'Siswa kurang dari 2!');
+    if (listSiswa.length < 2) return showAlert('Peringatan', 'Siswa kurang dari 2 untuk mode duel!');
 
     AppState.kuis.siswaTelahMainDuel = AppState.kuis.siswaTelahMainDuel || [];
-    let siswaBelumMain = listSiswa.filter(s => !AppState.kuis.siswaTelahMainDuel.includes(s.id));
+    AppState.kuis.siswaUndiUlangDuelPending = AppState.kuis.siswaUndiUlangDuelPending || [];
     
+    // 1. Cari siswa yang belum pernah duel sama sekali
+    let siswaBelumMain = listSiswa.filter(s => 
+        !AppState.kuis.siswaTelahMainDuel.includes(s.id) && 
+        !AppState.kuis.siswaUndiUlangDuelPending.includes(s.id)
+    );
+    
+    // 2. Jika sudah habis, ambil dari antrean pending (yang sempat di-skip/undi ulang)
+    if (siswaBelumMain.length < 2 && AppState.kuis.siswaUndiUlangDuelPending.length >= 2) {
+        showAlert('Info', 'Siswa utama duel habis. Mengambil dari antrean siswa yang sempat di-skip!', 'info');
+        siswaBelumMain = listSiswa.filter(s => AppState.kuis.siswaUndiUlangDuelPending.includes(s.id));
+        AppState.kuis.siswaUndiUlangDuelPending = []; 
+    }
+
+    // 3. Jika masih kurang dari 2 juga, reset total tabungan duel dari awal
     if (siswaBelumMain.length < 2) {
-        showAlert('Info', 'Sisa siswa habis di Mode Duel. Tabung undian duel di-reset ulang!', 'info');
+        showAlert('Info Sesi', 'Siklus duel selesai. Tabung undian duel di-reset ulang dari awal!', 'info');
         AppState.kuis.siswaTelahMainDuel = []; 
+        AppState.kuis.siswaUndiUlangDuelPending = [];
         siswaBelumMain = listSiswa;
     }
 
     const daftarSemuaNama = listSiswa.map(s => s.nama);
     let acakSiswa = [...siswaBelumMain].sort(() => 0.5 - Math.random());
+    
     let siswa1 = acakSiswa[0];
     let siswa2 = acakSiswa[1];
 
-    AppState.kuis.siswaTelahMainDuel.push(siswa1.id);
-    AppState.kuis.siswaTelahMainDuel.push(siswa2.id);
+    AppState.kuis.siswaTelahMainDuel.push(siswa1.id, siswa2.id);
     document.getElementById('lobby-pemain-a').value = siswa1.id;
     document.getElementById('lobby-pemain-b').value = siswa2.id;
+    
     eksekusiUndianMewah('duel', siswa1.nama, siswa2.nama, daftarSemuaNama);
 }
 
@@ -1437,28 +1453,29 @@ function aksiUndianSelesai(mode, aksi) {
     if (overlay) overlay.remove();
 
     if (aksi === 'lanjut') {
-        // Jika guru klik "Lanjut Kuis", jalankan hitung mundur
         mulaiHitungMundur(mode === 'single' ? 3 : 5);
     } else {
-        // Jika guru klik "Undi Ulang" karena anak ke kamar mandi/tidak siap:
+        // --- JIKA GURU KLIK UNDI ULANG ---
         if (mode === 'single') {
             if (AppState.kuis.siswaTelahMainSingle.length > 0) {
-                // Ambil ID siswa yang baru saja terundi (ada di posisi paling belakang array riwayat)
                 let idSiswaBatal = AppState.kuis.siswaTelahMainSingle.pop();
-                
-                // Simpan sementara ID ini ke dalam daftar tunda/pending khusus undi ulang
                 AppState.kuis.siswaUndiUlangPending = AppState.kuis.siswaUndiUlangPending || [];
                 AppState.kuis.siswaUndiUlangPending.push(idSiswaBatal);
             }
-            // Langsung putar undian lagi untuk mencari penggantinya dari yang belum main
             undiPemainSpin(); 
 
         } else if (mode === 'duel') {
-            // Untuk mode duel jika di-undi ulang
-            if (AppState.kuis.siswaTelahMainDuel.length > 1) {
-                AppState.kuis.siswaTelahMainDuel.pop();
-                AppState.kuis.siswaTelahMainDuel.pop();
+            // Dalam mode duel, kita ambil 2 nama terakhir yang baru saja diundi
+            if (AppState.kuis.siswaTelahMainDuel && AppState.kuis.siswaTelahMainDuel.length >= 2) {
+                let idSiswaB_Batal = AppState.kuis.siswaTelahMainDuel.pop(); // Pemain B
+                let idSiswaA_Batal = AppState.kuis.siswaTelahMainDuel.pop(); // Pemain A
+
+                // Kita asumsikan kedua pemain dibatalkan dulu untuk diundi ulang pasangannya,
+                // atau kita masukkan kembali ke pending duel supaya bisa dipasangkan dengan yang lain nanti.
+                AppState.kuis.siswaUndiUlangDuelPending = AppState.kuis.siswaUndiUlangDuelPending || [];
+                AppState.kuis.siswaUndiUlangDuelPending.push(idSiswaA_Batal, idSiswaB_Batal);
             }
+            // Langsung putar ulang undian duel untuk mencari pasangan baru yang lengkap
             undiPemainDuelSpin(); 
         }
     }
