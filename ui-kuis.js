@@ -1244,3 +1244,24 @@ function clearQuizTimeouts() {
         AppState.kuis.activeQuizTimeout = null;
     }
 }
+// ==========================================
+// KENDALI MODAL BANK SOAL (RECOVERY)
+// ==========================================
+function bukaModalBankSoal() {
+    const modal = document.getElementById('modal-bank-soal'); // Pastikan ID ini ada di file HTML
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    } else {
+        console.error("Elemen modal bank soal tidak ditemukan! Pastikan modalnya sudah ditaruh di index.html");
+        alert("Terjadi kesalahan: Modal Bank Soal tidak ditemukan di tampilan.");
+    }
+}
+
+function tutupModalBankSoal() {
+    const modal = document.getElementById('modal-bank-soal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
