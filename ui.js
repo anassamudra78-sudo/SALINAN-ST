@@ -754,41 +754,38 @@ function toggleEdgePanel() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => { 
-    // 1. PASTIKAN LOADER TAMPIL DAN MENUTUPI LAYAR
-    const loader = document.getElementById('app-preloader');
-    if (loader) {
-        loader.style.display = 'flex';
-        loader.style.opacity = '1';
-    }
+    // 1. Biarkan layar loading (app-preloader) tampil secara bawaan HTML
+    // Kita biarkan CSS bawaan Bapak bekerja memposisikannya di tengah layar.
 
-    // 2. TUNGGU PROSES AMBIL DATA SAMPAI TUNTAS 100%
+    // 2. TUNGGU DATABASE SELESAI DIMUAT DULU
     try {
-        // Di dalam loadDatabase() Bapak sudah ada perintah updateUI(), 
-        // sehingga fungsi ini otomatis akan mengisi kerangka Dashboard yang kosong
-        if (typeof loadDatabase === 'function') await loadDatabase(); 
+        await loadDatabase(); // loadDatabase sudah otomatis memanggil updateUI() di dalamnya
     } catch(e) {
         console.error("Gagal load database awal:", e);
     }
 
-    // 3. CEK STATUS LOGIN (Membasmi kedipan layar login)
+    // 3. CEK LOGIN (Singkirkan kotak login jika sudah masuk)
     const savedUser = localStorage.getItem('smart_teacher_user');
     const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
     const loginScreen = document.getElementById('login-screen');
 
     if (savedUser && savedUrl.startsWith("http")) {
+        // MATIKAN KOTAK LOGIN
         if (loginScreen) {
             loginScreen.style.display = 'none';
             loginScreen.classList.add('hidden');
         }
     } else {
-        if (typeof cekDanValidasiGasUrl === 'function') cekDanValidasiGasUrl();
+        cekDanValidasiGasUrl();
     }
 
-    // 4. TUTUP LOADER DENGAN HALUS (Hanya dieksekusi SETELAH layar terisi data)
-    if(loader) {
+    // 4. TUTUP LAYAR LOADING DENGAN HALUS
+    // Bagian ini HANYA dieksekusi setelah data Dashboard 100% tergambar
+    const loader = document.getElementById('app-preloader');
+    if (loader) {
+        loader.style.opacity = '0'; // Pudar perlahan (efek transisi)
         setTimeout(() => {
-            loader.style.opacity = '0';
-            setTimeout(() => loader.style.display = 'none', 500); // Transisi pudar 0.5 detik
-        }, 300); // Jeda estetis 0.3 detik sebelum mulai memudar
+            loader.style.display = 'none'; // Hilangkan sepenuhnya setelah pudar
+        }, 600); // Tunggu 0.6 detik agar pudar sempurna
     }
 });
