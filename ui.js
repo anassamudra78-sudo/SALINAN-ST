@@ -753,10 +753,55 @@ function toggleEdgePanel() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => { 
-    setTimeout(() => { const loader = document.getElementById('app-preloader'); if(loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 500); } }, 1000);
-    try { await loadDatabase(); } catch(e) { console.error("Gagal load database awal:", e); }
+    setTimeout(() => {
+        const loader = document.getElementById('app-preloader');
+        if(loader) {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 500);
+        }
+    }, 1000);
+
+    try {
+        if (typeof loadDatabase === 'function') await loadDatabase(); 
+    } catch(e) {
+        console.error("Gagal load database awal:", e);
+    }
+
     const savedUser = localStorage.getItem('smart_teacher_user');
-    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
-    if (savedUser && savedUrl.startsWith("http")) { const loginScreen = document.getElementById('login-screen'); if (loginScreen) loginScreen.style.display = 'none'; } 
-    else { cekDanValidasiGasUrl(); }
+    const loginScreen = document.getElementById('login-screen');
+    
+    // PERBAIKAN: Jika sudah login, langsung basmi layar login tanpa mempedulikan URL
+    if (savedUser) {
+        if (loginScreen) {
+            loginScreen.style.display = 'none';
+            loginScreen.classList.add('hidden');
+        }
+        cekDanValidasiGasUrl(true); // true = user sudah login
+    } else {
+        cekDanValidasiGasUrl(false); // false = user belum login
+    }
 });
+
+// Timpa juga fungsi cekDanValidasiGasUrl lama dengan yang baru ini
+function cekDanValidasiGasUrl(isAlreadyLoggedIn = false) {
+    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
+    const loginScreen = document.getElementById('login-screen');
+    const setupModal = document.getElementById('setup-db-modal');
+
+    if (!savedUrl || !savedUrl.startsWith("http")) {
+        // Hanya munculkan pop-up minta URL, jangan paksa buka layar login kalau sudah login
+        if (setupModal) setupModal.classList.remove('hidden');
+        
+        if (!isAlreadyLoggedIn && loginScreen) {
+            loginScreen.classList.remove('hidden');
+            loginScreen.style.display = 'flex'; 
+        }
+    } else {
+        if (setupModal) setupModal.classList.add('hidden');
+        
+        if (!isAlreadyLoggedIn && loginScreen) {
+            loginScreen.classList.remove('hidden');
+            loginScreen.style.display = 'flex'; 
+        }
+    }
+}
