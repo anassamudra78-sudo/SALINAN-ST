@@ -475,19 +475,38 @@ function undiPemainSpin() {
     if (listSiswa.length === 0) return showAlert('Peringatan', 'Belum ada siswa!');
 
     AppState.kuis.siswaTelahMainSingle = AppState.kuis.siswaTelahMainSingle || [];
-    let siswaBelumMain = listSiswa.filter(s => !AppState.kuis.siswaTelahMainSingle.includes(s.id));
+    AppState.kuis.siswaUndiUlangPending = AppState.kuis.siswaUndiUlangPending || [];
     
+    // 1. Cari siswa yang belum pernah main sama sekali
+    let siswaBelumMain = listSiswa.filter(s => 
+        !AppState.kuis.siswaTelahMainSingle.includes(s.id) && 
+        !AppState.kuis.siswaUndiUlangPending.includes(s.id)
+    );
+    
+    // 2. JIKA SEMUA SISWA BERSIH SUDAH KEBAGIAN, baru masukkan antrean "Undi Ulang" (yang tadi ke kamar mandi)
+    if (siswaBelumMain.length === 0 && AppState.kuis.siswaUndiUlangPending.length > 0) {
+        showAlert('Info', 'Siswa yang belum main sudah habis. Sekarang giliran siswa yang sempat di-skip (undi ulang) sebelumnya!', 'info');
+        // Pindahkan antrean undi ulang kembali menjadi prioritas untuk dimainkan sekarang
+        siswaBelumMain = listSiswa.filter(s => AppState.kuis.siswaUndiUlangPending.includes(s.id));
+        AppState.kuis.siswaUndiUlangPending = []; // Kosongkan penampungan pending
+    }
+
+    // 3. JIKA BENAR-BENAR SEMUA (termasuk yang pending) SUDAH SELESAI:
     if (siswaBelumMain.length === 0) {
-        showAlert('Info', 'Semua siswa sudah maju di Mode Single! Tabung undian di-reset ulang.', 'info');
+        showAlert('Info Sesi', 'Semua siswa (termasuk yang di-skip) sudah mendapat giliran! Tabung undian di-reset ulang dari awal.', 'info');
         AppState.kuis.siswaTelahMainSingle = []; 
+        AppState.kuis.siswaUndiUlangPending = [];
         siswaBelumMain = listSiswa; 
     }
 
     const daftarSemuaNama = listSiswa.map(s => s.nama);
     let acakSiswa = [...siswaBelumMain].sort(() => 0.5 - Math.random());
     let pemenang = acakSiswa[0];
+
+    // Masukkan ke riwayat main
     AppState.kuis.siswaTelahMainSingle.push(pemenang.id);
     document.getElementById('lobby-siswa').value = pemenang.id;
+    
     eksekusiUndianMewah('single', pemenang.nama, null, daftarSemuaNama);
 }
 
@@ -1418,14 +1437,28 @@ function aksiUndianSelesai(mode, aksi) {
     if (overlay) overlay.remove();
 
     if (aksi === 'lanjut') {
+        // Jika guru klik "Lanjut Kuis", jalankan hitung mundur
         mulaiHitungMundur(mode === 'single' ? 3 : 5);
     } else {
-        if (mode === 'single' && AppState.kuis.siswaTelahMainSingle.length > 0) {
-            AppState.kuis.siswaTelahMainSingle.pop();
+        // Jika guru klik "Undi Ulang" karena anak ke kamar mandi/tidak siap:
+        if (mode === 'single') {
+            if (AppState.kuis.siswaTelahMainSingle.length > 0) {
+                // Ambil ID siswa yang baru saja terundi (ada di posisi paling belakang array riwayat)
+                let idSiswaBatal = AppState.kuis.siswaTelahMainSingle.pop();
+                
+                // Simpan sementara ID ini ke dalam daftar tunda/pending khusus undi ulang
+                AppState.kuis.siswaUndiUlangPending = AppState.kuis.siswaUndiUlangPending || [];
+                AppState.kuis.siswaUndiUlangPending.push(idSiswaBatal);
+            }
+            // Langsung putar undian lagi untuk mencari penggantinya dari yang belum main
             undiPemainSpin(); 
-        } else if (mode === 'duel' && AppState.kuis.siswaTelahMainDuel.length > 1) {
-            AppState.kuis.siswaTelahMainDuel.pop();
-            AppState.kuis.siswaTelahMainDuel.pop();
+
+        } else if (mode === 'duel') {
+            // Untuk mode duel jika di-undi ulang
+            if (AppState.kuis.siswaTelahMainDuel.length > 1) {
+                AppState.kuis.siswaTelahMainDuel.pop();
+                AppState.kuis.siswaTelahMainDuel.pop();
+            }
             undiPemainDuelSpin(); 
         }
     }
