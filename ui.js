@@ -740,6 +740,7 @@ function dragFab(e) {
         fabContainer.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
     }
 }
+
 if (fabContainer && dragHandle) {
     fabContainer.addEventListener("touchstart", dragStartFab, { passive: false }); fabContainer.addEventListener("touchend", dragEndFab, { passive: false });
     fabContainer.addEventListener("touchmove", dragFab, { passive: false }); fabContainer.addEventListener("mousedown", dragStartFab);
