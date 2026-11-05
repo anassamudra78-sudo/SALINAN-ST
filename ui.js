@@ -753,55 +753,41 @@ function toggleEdgePanel() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => { 
-    setTimeout(() => {
-        const loader = document.getElementById('app-preloader');
-        if(loader) {
-            loader.style.opacity = '0';
-            setTimeout(() => loader.style.display = 'none', 500);
-        }
-    }, 1000);
+    // 1. PASTIKAN LOADER TAMPIL DAN MENUTUPI LAYAR
+    const loader = document.getElementById('app-preloader');
+    if (loader) {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+    }
 
+    // 2. TUNGGU PROSES AMBIL DATA SAMPAI TUNTAS 100%
     try {
+        // Di dalam loadDatabase() Bapak sudah ada perintah updateUI(), 
+        // sehingga fungsi ini otomatis akan mengisi kerangka Dashboard yang kosong
         if (typeof loadDatabase === 'function') await loadDatabase(); 
     } catch(e) {
         console.error("Gagal load database awal:", e);
     }
 
+    // 3. CEK STATUS LOGIN (Membasmi kedipan layar login)
     const savedUser = localStorage.getItem('smart_teacher_user');
+    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
     const loginScreen = document.getElementById('login-screen');
-    
-    // PERBAIKAN: Jika sudah login, langsung basmi layar login tanpa mempedulikan URL
-    if (savedUser) {
+
+    if (savedUser && savedUrl.startsWith("http")) {
         if (loginScreen) {
             loginScreen.style.display = 'none';
             loginScreen.classList.add('hidden');
         }
-        cekDanValidasiGasUrl(true); // true = user sudah login
     } else {
-        cekDanValidasiGasUrl(false); // false = user belum login
+        if (typeof cekDanValidasiGasUrl === 'function') cekDanValidasiGasUrl();
+    }
+
+    // 4. TUTUP LOADER DENGAN HALUS (Hanya dieksekusi SETELAH layar terisi data)
+    if(loader) {
+        setTimeout(() => {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 500); // Transisi pudar 0.5 detik
+        }, 300); // Jeda estetis 0.3 detik sebelum mulai memudar
     }
 });
-
-// Timpa juga fungsi cekDanValidasiGasUrl lama dengan yang baru ini
-function cekDanValidasiGasUrl(isAlreadyLoggedIn = false) {
-    const savedUrl = localStorage.getItem('ST_GAS_URL') || "";
-    const loginScreen = document.getElementById('login-screen');
-    const setupModal = document.getElementById('setup-db-modal');
-
-    if (!savedUrl || !savedUrl.startsWith("http")) {
-        // Hanya munculkan pop-up minta URL, jangan paksa buka layar login kalau sudah login
-        if (setupModal) setupModal.classList.remove('hidden');
-        
-        if (!isAlreadyLoggedIn && loginScreen) {
-            loginScreen.classList.remove('hidden');
-            loginScreen.style.display = 'flex'; 
-        }
-    } else {
-        if (setupModal) setupModal.classList.add('hidden');
-        
-        if (!isAlreadyLoggedIn && loginScreen) {
-            loginScreen.classList.remove('hidden');
-            loginScreen.style.display = 'flex'; 
-        }
-    }
-}
