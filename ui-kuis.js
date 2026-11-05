@@ -1512,3 +1512,324 @@ function mulaiHitungMundur(detikTunggu) {
         }
     }, 1000);
 }
+// ==========================================
+// BAGIAN 2: PODIUM, PAPAN SKOR & KENDALI BANK SOAL
+// ==========================================
+
+function resetPodiumSesiIni() {
+    if(confirm("Kosongkan Papan Podium & 10 Besar untuk Sesi ini? (Data nilai tetap aman di menu Rekap Nilai)")) {
+        AppState.kuis.waktuResetSesi = Date.now(); 
+        bukaPapanSkorPodium(); 
+    }
+}
+
+function bukaPapanSkorPodium() {
+    playSoundEffect('podium');
+    const container = document.getElementById('main-content');
+    
+    let sumberData = AppState.db.penilaian || [];
+    const awalHariIni = new Date().setHours(0, 0, 0, 0); 
+    
+    sumberData = sumberData.filter(p => {
+        const waktuMain = p.timestamp || 0;
+        const validWaktu = waktuMain >= awalHariIni && waktuMain >= AppState.kuis.waktuResetSesi;
+        const validKelas = AppState.kuis.kelasAktif ? p.kelasId === AppState.kuis.kelasAktif : true;
+        const validMapel = AppState.kuis.mapelAktif ? p.mapelId === AppState.kuis.mapelAktif : true;
+        return validWaktu && validKelas && validMapel;
+    });
+
+    let listNilai = sumberData.map(p => {
+        let refSiswa = AppState.db.siswa.find(s => s.id === p.siswaId);
+        let refKelas = AppState.db.kelas.find(k => k.id === p.kelasId);
+        return {
+            nama: refSiswa ? refSiswa.nama : 'Pemain',
+            kelas: refKelas ? refKelas.kode : '-',
+            nilai: p.nilai || 0
+        };
+    }).sort((a,b) => b.nilai - a.nilai);
+
+    let j1 = listNilai[0] || { nama: 'Menunggu Pemain...', kelas: '-', nilai: 0 };
+    let j2 = listNilai[1] || { nama: '-', kelas: '-', nilai: 0 };
+    let j3 = listNilai[2] || { nama: '-', kelas: '-', nilai: 0 };
+
+    let top10Rows = listNilai.slice(3, 13).map((item, i) => `
+        <tr class="border-b border-slate-100 dark:border-slate-800 opacity-0" style="animation: fadeIn 0.4s forwards; animation-delay: ${3.5 + (i * 0.15)}s;">
+            <td class="py-2.5 px-4 font-bold text-slate-500">${i + 4}</td>
+            <td class="py-2.5 px-4 font-bold text-slate-800 dark:text-white">${item.nama}</td>
+            <td class="py-2.5 px-4 text-center font-bold text-slate-500">${item.kelas}</td>
+            <td class="py-2.5 px-4 text-right font-black text-emerald-500">${item.nilai}</td>
+        </tr>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="max-w-4xl mx-auto space-y-6 fade-in">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+                <button onclick="switchTab('kuis')" class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-2.5 px-5 rounded-xl text-xs">
+                    <i class="fa-solid fa-arrow-left mr-2"></i> Kembali
+                </button>
+                <h3 class="text-lg sm:text-xl font-black text-slate-800 dark:text-white opacity-0" style="animation: fadeIn 0.5s forwards; animation-delay: 0.2s;">
+                    <i class="fa-solid fa-trophy text-amber-400 mr-2"></i>PODIUM HARIAN & KELAS
+                </h3>
+                <button onclick="resetPodiumSesiIni()" class="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-sm">
+                    <i class="fa-solid fa-rotate-left mr-1.5"></i> Reset Podium Sesi Ini
+                </button>
+            </div>
+
+            <div class="bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 rounded-3xl p-8 text-white shadow-2xl border border-amber-500/30 text-center relative overflow-hidden">
+                <div class="grid grid-cols-3 gap-3 items-end max-w-xl mx-auto pt-8 pb-4">
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.6s forwards; animation-delay: 1.5s;">
+                        <div class="w-12 h-12 rounded-full bg-slate-300 text-slate-900 flex items-center justify-center font-black text-lg shadow-lg mb-2 ring-4 ring-slate-400">2</div>
+                        <p class="text-xs font-bold text-white truncate max-w-[90px]">${j2.nama}</p>
+                        <p class="text-[10px] text-slate-300">${j2.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-slate-600 to-slate-400 h-28 rounded-t-2xl mt-2 flex items-center justify-center font-black text-2xl shadow-inner">${j2.nilai > 0 ? j2.nilai : '-'}</div>
+                    </div>
+
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.8s forwards; animation-delay: 2.5s;">
+                        <i class="fa-solid fa-crown text-3xl text-yellow-300 mb-1 animate-bounce"></i>
+                        <div class="w-16 h-16 rounded-full bg-yellow-400 text-slate-950 flex items-center justify-center font-black text-2xl shadow-2xl mb-2 ring-4 ring-yellow-300">1</div>
+                        <p class="text-sm font-black text-yellow-300 truncate max-w-[110px]">${j1.nama}</p>
+                        <p class="text-xs text-amber-200 font-bold">${j1.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-amber-600 via-yellow-500 to-amber-400 h-40 rounded-t-2xl mt-2 flex items-center justify-center font-black text-3xl shadow-2xl text-slate-950">${j1.nilai > 0 ? j1.nilai : '-'}</div>
+                    </div>
+
+                    <div class="flex flex-col items-center opacity-0" style="animation: popBadge 0.6s forwards; animation-delay: 0.5s;">
+                        <div class="w-12 h-12 rounded-full bg-amber-700 text-white flex items-center justify-center font-black text-lg shadow-lg mb-2 ring-4 ring-amber-600">3</div>
+                        <p class="text-xs font-bold text-white truncate max-w-[90px]">${j3.nama}</p>
+                        <p class="text-[10px] text-slate-300">${j3.kelas}</p>
+                        <div class="w-full bg-gradient-to-t from-amber-900 to-amber-700 h-20 rounded-t-2xl mt-2 flex items-center justify-center font-black text-xl shadow-inner">${j3.nilai > 0 ? j3.nilai : '-'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm opacity-0" style="animation: fadeIn 0.6s forwards; animation-delay: 3.5s;">
+                <h4 class="font-bold text-slate-800 dark:text-white text-sm mb-4"><i class="fa-solid fa-list-ol mr-2 text-indigo-500"></i>Peringkat Top 10 Lainnya (Sesi Ini)</h4>
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-slate-800 text-slate-500 font-bold uppercase">
+                        <tr><th class="py-2.5 px-4 w-12">Rank</th><th class="py-2.5 px-4">Nama Siswa</th><th class="py-2.5 px-4 text-center">Kelas</th><th class="py-2.5 px-4 text-right">Skor Kuis</th></tr>
+                    </thead>
+                    <tbody>${top10Rows || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Belum ada peringkat untuk sesi ini.</td></tr>'}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    setTimeout(() => confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } }), 2500);
+}
+
+function bukaModalBankSoal() {
+    renderDaftarSoalModal();
+    const modal = document.getElementById('bank-soal-modal');
+    if(modal) modal.classList.remove('hidden');
+}
+
+function tutupModalBankSoal() {
+    const modal = document.getElementById('bank-soal-modal');
+    if(modal) modal.classList.add('hidden');
+}
+
+function renderDaftarSoalModal() {
+    const listContainer = document.getElementById('modal-bank-list');
+    if(!listContainer) return;
+    const counterBadge = document.getElementById('modal-bank-counter');
+    const headerBadge = document.getElementById('header-bank-badge');
+    const searchVal = (document.getElementById('search-soal-input')?.value || '').toLowerCase();
+
+    const totalSoal = AppState.kuis.bankSoalManual.length;
+    if (counterBadge) counterBadge.innerText = `${totalSoal} Soal`;
+    if (headerBadge) headerBadge.innerText = totalSoal;
+
+    if (totalSoal === 0) {
+        listContainer.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs font-bold">Bank soal masih kosong</div>`;
+        return;
+    }
+
+    let filtered = AppState.kuis.bankSoalManual.map((item, idx) => ({ ...item, originalIndex: idx }));
+    if (searchVal) {
+        filtered = filtered.filter(item => 
+            item.soal.toLowerCase().includes(searchVal) || 
+            item.opsi.some(o => o.toLowerCase().includes(searchVal))
+        );
+    }
+
+    listContainer.innerHTML = filtered.map(item => {
+        const idx = item.originalIndex;
+        return `
+            <div id="card-soal-${idx}" class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 transition-all">
+                <div id="view-soal-${idx}">
+                    <div class="flex justify-between items-start gap-3 mb-2">
+                        <div class="flex items-start gap-2.5">
+                            <span class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-black px-2.5 py-1 rounded-xl shrink-0">#${idx + 1}</span>
+                            <p class="text-xs font-bold text-slate-100 leading-relaxed">${item.soal}</p>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <button onclick="toggleInlineEditSoal(${idx})" class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 flex items-center justify-center transition-colors"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                            <button onclick="hapusSoalDenganUndo(${idx})" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-2 border-t border-white/5 text-xs">
+                        ${item.opsi.map((op, oIdx) => `
+                            <div class="px-3 py-1.5 rounded-xl border flex items-center justify-between ${oIdx === item.jawaban_benar_index ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-400'}">
+                                <span>${String.fromCharCode(65 + oIdx)}. ${op}</span>${oIdx === item.jawaban_benar_index ? '<i class="fa-solid fa-check text-emerald-400 text-xs"></i>' : ''}
+                            </div>`).join('')}
+                    </div>
+                </div>
+
+                <div id="edit-soal-${idx}" class="hidden space-y-3 pt-1">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span class="text-xs font-black text-amber-400"><i class="fa-solid fa-pen-to-square mr-1"></i> Edit Soal #${idx + 1}</span>
+                        <button onclick="toggleInlineEditSoal(${idx})" class="text-xs text-slate-400">Batal</button>
+                    </div>
+                    <textarea id="edit-input-soal-${idx}" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white">${item.soal}</textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="edit-input-a-${idx}" value="${item.opsi[0] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-b-${idx}" value="${item.opsi[1] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-c-${idx}" value="${item.opsi[2] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                        <input type="text" id="edit-input-d-${idx}" value="${item.opsi[3] || ''}" class="bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white">
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <select id="edit-input-kunci-${idx}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs font-bold text-white">
+                            <option value="0" ${item.jawaban_benar_index === 0 ? 'selected' : ''}>Kunci: Opsi A</option>
+                            <option value="1" ${item.jawaban_benar_index === 1 ? 'selected' : ''}>Kunci: Opsi B</option>
+                            <option value="2" ${item.jawaban_benar_index === 2 ? 'selected' : ''}>Kunci: Opsi C</option>
+                            <option value="3" ${item.jawaban_benar_index === 3 ? 'selected' : ''}>Kunci: Opsi D</option>
+                        </select>
+                        <button onclick="simpanInlineEditSoal(${idx})" class="bg-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs">Simpan</button>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function toggleInlineEditSoal(index) {
+    const viewDiv = document.getElementById(`view-soal-${index}`);
+    const editDiv = document.getElementById(`edit-soal-${index}`);
+    if (viewDiv && editDiv) {
+        viewDiv.classList.toggle('hidden');
+        editDiv.classList.toggle('hidden');
+    }
+}
+
+function simpanInlineEditSoal(index) {
+    const soal = document.getElementById(`edit-input-soal-${index}`).value.trim();
+    const a = document.getElementById(`edit-input-a-${index}`).value.trim();
+    const b = document.getElementById(`edit-input-b-${index}`).value.trim();
+    const c = document.getElementById(`edit-input-c-${index}`).value.trim();
+    const d = document.getElementById(`edit-input-d-${index}`).value.trim();
+    const kunci = parseInt(document.getElementById(`edit-input-kunci-${index}`).value);
+
+    if (!soal || !a || !b || !c || !d) return alert("Soal dan Opsi harus diisi lengkap!");
+
+    AppState.kuis.bankSoalManual[index] = { ...AppState.kuis.bankSoalManual[index], soal, opsi: [a, b, c, d], jawaban_benar_index: kunci };
+    if (typeof simpanKeLocalStorage === 'function') simpanKeLocalStorage();
+    renderDaftarSoalModal();
+}
+// ==========================================
+// BAGIAN 3: RADAR MISPERSEPSI & FITUR PELENGKAP KUIS
+// ==========================================
+
+function cekRadarSoalTersulit() {
+    const radarCard = document.getElementById('radar-tersulit-card');
+    const radarMsg = document.getElementById('radar-tersulit-msg');
+    if (!radarCard || !radarMsg) return;
+
+    let entries = Object.entries(AppState.db.mispersepsiSoal || {}).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+        radarCard.classList.add('hidden');
+        return;
+    }
+
+    let topSalah = entries[0];
+    if (topSalah[1] >= 2) { // Muncul jika ada minimal 2 kali salah di kelas
+        let soalObj = AppState.kuis.bankSoalManual.find(s => s.id === topSalah[0]);
+        if (soalObj) {
+            radarMsg.innerText = `Soal "${soalObj.soal.substring(0, 45)}..." dijawab salah oleh ${topSalah[1]} siswa! Perlu dibahas ulang.`;
+            radarCard.classList.remove('hidden');
+        } else {
+            radarCard.classList.add('hidden');
+        }
+    } else {
+        radarCard.classList.add('hidden');
+    }
+}
+
+function bukaBedahSoalTersulit() {
+    let entries = Object.entries(AppState.db.mispersepsiSoal || {}).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return;
+
+    let topSalah = entries[0];
+    let soalObj = AppState.kuis.bankSoalManual.find(s => s.id === topSalah[0]);
+    if (!soalObj) return;
+
+    // Pastikan elemen modal bedah soal ada, atau buat alert ringkas jika modal belum terpampang di HTML
+    const statsText = document.getElementById('bedah-stats-text');
+    const contentBox = document.getElementById('bedah-soal-content');
+    const modal = document.getElementById('bedah-soal-modal');
+
+    if (statsText && contentBox && modal) {
+        statsText.innerText = `Dijawab salah oleh ${topSalah[1]} siswa`;
+        
+        let opsiList = soalObj.opsi.map((o, idx) => {
+            let isKunci = idx === soalObj.jawaban_benar_index;
+            return `
+                <div class="p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${isKunci ? 'bg-emerald-950/85 border-emerald-500/50 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                    <span>${String.fromCharCode(65+idx)}. ${o}</span>
+                    ${isKunci ? '<span class="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black">KUNCI BENAR</span>' : ''}
+                </div>
+            `;
+        }).join('');
+
+        contentBox.innerHTML = `
+            <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 mb-3">
+                <p class="text-xs text-slate-400 font-bold mb-1">Pertanyaan Soal:</p>
+                <p class="text-sm font-bold text-white">${soalObj.soal}</p>
+            </div>
+            <div class="space-y-2">${opsiList}</div>
+        `;
+        modal.classList.remove('hidden');
+    } else {
+        alert(`Analisis Soal Tersulit:\n\n"${soalObj.soal}"\nTercatat salah sebanyak ${topSalah[1]} kali oleh siswa.`);
+    }
+}
+
+function closeBedahSoalModal() {
+    const modal = document.getElementById('bedah-soal-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+let undoBufferSoal = null;
+let undoTimeoutId = null;
+
+function hapusSoalDenganUndo(index) {
+    if (undoTimeoutId) clearTimeout(undoTimeoutId);
+    undoBufferSoal = { index: index, data: AppState.kuis.bankSoalManual[index] };
+    AppState.kuis.bankSoalManual.splice(index, 1);
+    simpanKeLocalStorage();
+    renderDaftarSoalModal();
+
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.classList.remove('hidden');
+
+    undoTimeoutId = setTimeout(() => {
+        undoBufferSoal = null;
+        if (toast) toast.classList.add('hidden');
+    }, 5000);
+}
+
+function batalHapusSoalUndo() {
+    if (undoBufferSoal) {
+        AppState.kuis.bankSoalManual.splice(undoBufferSoal.index, 0, undoBufferSoal.data);
+        undoBufferSoal = null;
+        if (undoTimeoutId) clearTimeout(undoTimeoutId);
+        simpanKeLocalStorage();
+        renderDaftarSoalModal();
+
+        const toast = document.getElementById('undo-toast');
+        if (toast) toast.classList.add('hidden');
+    }
+}
+
+function simpanKeLocalStorage() {
+    localStorage.setItem('smartTeacher_bankSoal', JSON.stringify(AppState.kuis.bankSoalManual));
+    if (typeof saveDatabase === 'function') {
+        saveDatabase();
+    }
+}
