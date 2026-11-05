@@ -1265,3 +1265,250 @@ function tutupModalBankSoal() {
         modal.style.display = 'none';
     }
 }
+// ==========================================
+// BAGIAN 1: MESIN UNDIAN MEWAH & COUNTDOWN
+// ==========================================
+
+function aturSkalaNama(element, teks) {
+    const panjang = teks.length;
+    const isDuel = (element.id === 'nama-kiri' || element.id === 'nama-kanan');
+
+    if (isDuel) {
+        if (panjang > 22) element.style.fontSize = '1.2rem';   
+        else if (panjang > 14) element.style.fontSize = '1.7rem';   
+        else element.style.fontSize = '2.4rem';   
+    } else {
+        if (panjang > 24) element.style.fontSize = '1.8rem';   
+        else if (panjang > 15) element.style.fontSize = '2.6rem';   
+        else element.style.fontSize = '3.6rem';   
+    }
+}
+
+function putarNamaAcak(element, daftarNama, durasi, namaPemenang, callback) {
+    let waktu = 0;
+    let interval = 60; 
+    const ctx = getAudioCtx();
+
+    let timer = setInterval(() => {
+        waktu += interval;
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(450, ctx.currentTime);
+                gain.gain.setValueAtTime(0.03, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.05);
+            } catch(e) {}
+        }
+        
+        let acak = daftarNama[Math.floor(Math.random() * daftarNama.length)];
+        aturSkalaNama(element, acak);
+        element.innerText = acak;
+        
+        if (waktu >= durasi) {
+            clearInterval(timer);
+            aturSkalaNama(element, namaPemenang);
+            element.innerText = namaPemenang;
+            element.style.color = '#fbbf24'; 
+            element.style.transform = 'scale(1.05)';
+            element.style.transition = 'all 0.3s ease';
+            if (callback) callback();
+        }
+    }, interval);
+}
+
+function eksekusiUndianMewah(mode, pemenang1, pemenang2 = null, daftarSemuaSiswa = []) {
+    if (!daftarSemuaSiswa || daftarSemuaSiswa.length === 0) {
+        daftarSemuaSiswa = ["AGUS", "BUDI", "CITRA", "DEWI", "EKO", "FAJAR", "GITA", "HADI", "INTAN"];
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'layar-undian-v2';
+    overlay.className = 'fixed inset-0 z-[9999] bg-slate-950/95 flex items-center justify-center backdrop-blur-md transition-opacity';
+    
+    if (mode === 'single') {
+        overlay.innerHTML = `
+            <div class="text-center relative px-6 w-full max-w-4xl mx-auto">
+                <h2 class="text-amber-400 font-black text-xl lg:text-2xl mb-8 tracking-widest uppercase animate-pulse">Mencari Pemain...</h2>
+                <div class="w-full bg-gradient-to-br from-indigo-600 to-purple-900 border-4 border-indigo-400 px-8 py-8 rounded-3xl shadow-[0_0_50px_rgba(79,70,229,0.5)] flex items-center justify-center min-h-[160px]">
+                    <div id="nama-slot" class="font-black text-white w-full uppercase tracking-wider text-center break-words leading-tight" style="text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">
+                        ???
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const elNama = document.getElementById('nama-slot');
+        aturSkalaNama(elNama, "???");
+        
+        putarNamaAcak(elNama, daftarSemuaSiswa, 3000, pemenang1, () => {
+            playSoundEffect('terpilih'); 
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 } }); 
+            setTimeout(() => tampilkanTombolKonfirmasiUndian(overlay, 'single'), 1000); 
+        });
+
+    } else if (mode === 'duel') {
+        overlay.innerHTML = `
+            <div id="arena-clash" class="w-full max-w-7xl mx-auto h-full flex items-center justify-between px-4 lg:px-12 relative overflow-hidden">
+                <div class="flex-1 flex justify-end">
+                    <div id="kartu-kiri" class="w-full max-w-md bg-gradient-to-br from-blue-700 to-cyan-900 border-4 border-blue-400 rounded-3xl p-6 lg:p-8 text-center shadow-[0_0_50px_rgba(37,99,235,0.6)] opacity-0 flex flex-col justify-center min-h-[190px]" style="animation: clashLeft 0.8s ease-out forwards;">
+                        <h3 class="text-blue-300 font-black text-lg lg:text-xl mb-4 tracking-widest">SUDUT BIRU</h3>
+                        <div id="nama-kiri" class="font-black text-white uppercase tracking-wider break-words leading-tight">???</div>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0 flex items-center justify-center z-50 mx-4 lg:mx-8">
+                    <div id="logo-vs" class="pr-4 text-7xl lg:text-8xl font-black text-red-500 italic ... drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] opacity-0" style="text-shadow: 4px 4px 0px #fff; animation: pulseVs 0.5s ease-out 0.8s forwards;">
+                        VS
+                    </div>
+                </div>
+
+                <div class="flex-1 flex justify-start">
+                    <div id="kartu-kanan" class="w-full max-w-md bg-gradient-to-br from-red-700 to-rose-900 border-4 border-red-400 rounded-3xl p-6 lg:p-8 text-center shadow-[0_0_50px_rgba(225,29,72,0.6)] opacity-0 flex flex-col justify-center min-h-[190px]" style="animation: clashRight 0.8s ease-out forwards;">
+                        <h3 class="text-red-300 font-black text-lg lg:text-xl mb-4 tracking-widest">SUDUT MERAH</h3>
+                        <div id="nama-kanan" class="font-black text-white uppercase tracking-wider break-words leading-tight">???</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const arena = document.getElementById('arena-clash');
+        
+        setTimeout(() => {
+            arena.style.animation = 'clashShake 0.5s ease-in-out';
+        }, 800);
+
+        setTimeout(() => {
+            const elKiri = document.getElementById('nama-kiri');
+            const elKanan = document.getElementById('nama-kanan');
+            
+            putarNamaAcak(elKiri, daftarSemuaSiswa, 3500, pemenang1);
+            putarNamaAcak(elKanan, daftarSemuaSiswa, 3500, pemenang2, () => {
+                playSoundEffect('terpilih'); 
+                confetti({ particleCount: 200, spread: 150, origin: { y: 0.5 } }); 
+                setTimeout(() => tampilkanTombolKonfirmasiUndian(overlay, 'duel'), 1000); 
+            });
+        }, 1000);
+    }
+}
+
+function tampilkanTombolKonfirmasiUndian(overlay, mode) {
+    const btnBox = document.createElement('div');
+    btnBox.className = 'absolute bottom-10 lg:bottom-16 left-1/2 transform -translate-x-1/2 flex flex-col sm:flex-row gap-4 z-[99999] fade-in';
+    btnBox.innerHTML = `
+        <button onclick="aksiUndianSelesai('${mode}', 'ulang')" class="bg-slate-900/80 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/50 font-black py-3.5 px-8 rounded-2xl shadow-xl transition-all hover:scale-105 flex items-center justify-center">
+            <i class="fa-solid fa-rotate-right mr-2 text-lg"></i> Undi Ulang
+        </button>
+        <button onclick="aksiUndianSelesai('${mode}', 'lanjut')" class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-3.5 px-10 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-400/50 transition-all hover:scale-105 flex items-center justify-center">
+            <i class="fa-solid fa-play mr-2 text-lg"></i> Lanjut Kuis
+        </button>
+    `;
+    overlay.appendChild(btnBox);
+}
+
+function aksiUndianSelesai(mode, aksi) {
+    const overlay = document.getElementById('layar-undian-v2');
+    if (overlay) overlay.remove();
+
+    if (aksi === 'lanjut') {
+        mulaiHitungMundur(mode === 'single' ? 3 : 5);
+    } else {
+        if (mode === 'single' && AppState.kuis.siswaTelahMainSingle.length > 0) {
+            AppState.kuis.siswaTelahMainSingle.pop();
+            undiPemainSpin(); 
+        } else if (mode === 'duel' && AppState.kuis.siswaTelahMainDuel.length > 1) {
+            AppState.kuis.siswaTelahMainDuel.pop();
+            AppState.kuis.siswaTelahMainDuel.pop();
+            undiPemainDuelSpin(); 
+        }
+    }
+}
+
+function mulaiHitungMundur(detikTunggu) {
+    const overlayCount = document.createElement('div');
+    overlayCount.id = 'layar-hitung-mundur';
+    overlayCount.className = 'fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center transition-all duration-300';
+    
+    overlayCount.innerHTML = `
+        <h2 class="text-slate-400 font-bold text-xl uppercase tracking-[0.3em] mb-8">Persiapan Kuis</h2>
+        <div id="angka-mundur" class="text-[12rem] lg:text-[18rem] font-black text-amber-500 leading-none" style="text-shadow: 0 0 25px rgba(245,158,11,0.4);">
+            ${detikTunggu}
+        </div>
+    `;
+    document.body.appendChild(overlayCount);
+
+    const angkaEl = document.getElementById('angka-mundur');
+    let sisaDetik = detikTunggu;
+    const ctx = getAudioCtx(); 
+
+    function playBeepShort() {
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                gain.gain.setValueAtTime(0.5, ctx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            } catch(e) {}
+        }
+    }
+
+    function playBeepLong() {
+        if (ctx.state === 'running') {
+            try {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(800, ctx.currentTime); 
+                gain.gain.setValueAtTime(0.8, ctx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8); 
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.8);
+            } catch(e) {}
+        }
+    }
+
+    playBeepShort(); 
+
+    let timerMundur = setInterval(() => {
+        sisaDetik--;
+        
+        if (sisaDetik > 0) {
+            angkaEl.innerText = sisaDetik;
+            angkaEl.style.transform = 'scale(1.2)';
+            setTimeout(() => angkaEl.style.transform = 'scale(1)', 150);
+            playBeepShort();
+            
+        } else {
+            clearInterval(timerMundur);
+            
+            overlayCount.style.background = "#020617"; 
+            
+            angkaEl.innerText = "MULAI!";
+            angkaEl.className = "text-[6rem] lg:text-[10rem] font-black text-emerald-500 tracking-widest";
+            
+            angkaEl.style.textShadow = "0 0 35px rgba(16,185,129,0.5)"; 
+            
+            playBeepLong();
+
+            setTimeout(() => {
+                overlayCount.remove();
+                mulaiKuisSebenarnya(); 
+            }, 800);
+        }
+    }, 1000);
+}
