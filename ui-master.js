@@ -843,7 +843,10 @@ async function tarikDataGateway(kelasId) {
             
         dataGateway.forEach(absenGerbang => {
             if (absenGerbang.nis && absenGerbang.tanggal) {
-                const siswaMatch = siswaKelas.find(s => String(s.nis) === String(absenGerbang.nis));
+                let nisBersih = String(absenGerbang.nis);
+                    if (nisBersih.includes('|')) nisBersih = nisBersih.split('|')[0];
+                    if (nisBersih.includes(' ')) nisBersih = nisBersih.split(' ')[0];
+                    const siswaMatch = siswaKelas.find(s => Number(s.nis) === Number(nisBersih) || String(s.id) === nisBersih);
                 if (siswaMatch) {
                     const idx = AppState.db.absensi.findIndex(a => a.siswaId === siswaMatch.id && a.tanggal === absenGerbang.tanggal && a.kelasId === kelasId);
                     if (idx >= 0) {
