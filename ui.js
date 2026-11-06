@@ -70,10 +70,17 @@ function updateUI() {
     renderContent(AppState.ui.activeTab);
 }
 
-function switchTab(tabId) {
+// ui.js - Modifikasi fungsi switchTab
+function switchTab(tabId, dariHistory = false) {
     AppState.ui.activeTab = tabId;
     AppState.ui.editingId = null;
     if (AppState.ui.dashboardClockInterval) clearInterval(AppState.ui.dashboardClockInterval);
+    
+    // SUNTIKAN PROFESIONAL: Catat riwayat ke browser jika ini bukan dari tombol back
+    if (!dariHistory) {
+        history.pushState({ tab: tabId, type: 'halaman' }, "", "#" + tabId);
+    }
+
     const tabInfo = menuItems.find(m => m.id === tabId);
     if(tabInfo) {
         document.getElementById('page-title').innerText = tabInfo.title;
@@ -89,7 +96,6 @@ function switchTab(tabId) {
     toggleMobileMenu(true);
     updateUI();
 }
-
 function renderNavigation() {
     let htmlContent = '';
     menuGroups.forEach((groupObj, idx) => {
@@ -787,5 +793,68 @@ window.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             loader.style.display = 'none'; // Hilangkan sepenuhnya setelah pudar
         }, 600); // Tunggu 0.6 detik agar pudar sempurna
+    }
+});
+
+// ui.js - Taruh di baris paling bawah
+
+// 1. Catat Dashboard saat aplikasi pertama kali dimuat
+window.addEventListener('load', () => {
+    history.replaceState({ tab: 'dashboard', type: 'halaman' }, "", "#dashboard");
+});
+
+// 2. Mesin Pencegat Swipe Back / Tombol Kembali Android
+window.addEventListener('popstate', (event) => {
+    // A. PRIORITAS 1: Tutup Modal / Layar Penuh (Seperti Arena Kuis atau Form Import)
+    const modalsTerbuka = Array.from(document.querySelectorAll('.fixed.inset-0')).filter(m => !m.classList.contains('hidden') && m.style.display !== 'none');
+    
+    // Abaikan layar preloader dan layar login dari deteksi ini
+    const modalsValid = modalsTerbuka.filter(m => m.id !== 'app-preloader' && m.id !== 'login-screen');
+    
+    if (modalsValid.length > 0) {
+        // Hentikan swipe back agar aplikasi tidak keluar
+        history.pushState(null, "", location.href); 
+        
+        // Cek secara spesifik jika yang terbuka adalah Arena Kuis
+        const arenaKuis = document.getElementById('quiz-arena-modal');
+        if (arenaKuis && !arenaKuis.classList.contains('hidden')) {
+            keluarArenaKuis(); // Panggil fungsi resmi dari ui-kuis.js
+            return;
+        }
+
+        // Tutup modal paling atas secara umum
+        modalsValid[modalsValid.length - 1].classList.add('hidden');
+        return;
+    }
+
+    // B. PRIORITAS 2: Tutup Laci Samping (Edge Panel / Sidebar Mobile)
+    const sidebar = document.getElementById('mobile-drawer');
+    const edgePanel = document.getElementById('edge-panel');
+    let menutupLaci = false;
+
+    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+        toggleMobileMenu(true); // Panggil fungsi resmi dari ui.js
+        menutupLaci = true;
+    }
+    if (edgePanel && edgePanel.classList.contains('translate-x-0')) {
+        toggleEdgePanel(); // Panggil fungsi resmi dari ui.js
+        menutupLaci = true;
+    }
+
+    if (menutupLaci) {
+        history.pushState(null, "", location.href);
+        return;
+    }
+
+    // C. PRIORITAS 3: Mundur ke Halaman Sebelumnya
+    if (event.state && event.state.type === 'halaman') {
+        // Jika kembali ke halaman utama, gunakan parameter true agar tidak mencatat riwayat ganda
+        switchTab(event.state.tab, true);
+    } else {
+        // D. PRIORITAS TERAKHIR: Konfirmasi Keluar jika sudah diujung riwayat
+        const yakinKeluar = confirm("Yakin Anda mau keluar dari aplikasi Smart Teacher?");
+        if (!yakinKeluar) {
+            history.pushState({ tab: AppState.ui.activeTab, type: 'halaman' }, "", "#" + AppState.ui.activeTab); 
+        }
     }
 });
