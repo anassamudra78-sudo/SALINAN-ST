@@ -873,36 +873,86 @@ async function tarikDataGateway(kelasId) {
     }
 }
 
-// --- PENCEGAT SWIPE BACK (ANTI KELUAR APLIKASI) ---
+// --- SISTEM GESTUR KEMBALI PROFESIONAL (SMART HISTORY) ---
 
-// 1. Tanamkan satu riwayat penahan saat aplikasi pertama kali dimuat
-history.pushState(null, null, location.href);
+let hitungSwipeKeluar = 0;
+let timerSwipe = null;
 
-// 2. Tangkap gestur usap/tombol kembali
+// Tanamkan riwayat awal penahan aplikasi
+history.pushState('smart-teacher', null, location.href);
+
 window.addEventListener('popstate', function(event) {
-    
-    // KUNCI UTAMA: Langsung paksa browser maju lagi 1 langkah agar riwayat tidak habis (anti-keluar)
-    history.go(1); 
+    // Tahan agar aplikasi tidak langsung tertutup oleh browser
+    history.pushState('smart-teacher', null, location.href); 
 
-    let aksiPenutupan = false;
+    // 1. Tutup peringatan (SweetAlert) jika sedang muncul di layar
+    if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+        Swal.close();
+        return;
+    }
 
-    // A. Tutup Sidebar jika sedang terbuka
+    // 2. Tutup Sidebar di HP (Di Tablet tidak akan terpengaruh)
     const sidebar = document.getElementById('sidebar');
-    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+    if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 1024) {
         sidebar.classList.add('-translate-x-full');
-        aksiPenutupan = true;
+        return;
     }
 
-    // B. Tutup Modal / Layar Pop-up jika ada yang terbuka
-    const modals = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+    // 3. Tutup Modal biasa (Layar overlay pop-up)
+    const modals = Array.from(document.querySelectorAll('.fixed.inset-0')).filter(m => !m.classList.contains('hidden') && m.style.display !== 'none');
     if (modals.length > 0) {
-        modals.forEach(m => m.classList.add('hidden'));
-        aksiPenutupan = true;
+        modals[modals.length - 1].classList.add('hidden');
+        return;
     }
 
-    // C. Jika layar sedang bersih (tidak ada menu/modal terbuka), kembalikan ke Dashboard Utama
-    if (!aksiPenutupan) {
-        const btnDashboard = document.querySelector('[onclick*="dashboard"]'); // Sesuaikan pemanggil dashboard
-        if (btnDashboard) btnDashboard.click();
+    // 4. KUNCI PROFESIONAL: Deteksi & Klik Otomatis tombol "Keluar" / "Kembali"
+    // Ini akan mencegat antarmuka seperti Arena Kuis agar kembali ke layar sebelumnya.
+    // 'offsetParent !== null' memastikan sistem hanya mengklik tombol yang BENAR-BENAR SEDANG TAMPIL di layar.
+    const tombolKembaliLayar = Array.from(document.querySelectorAll('button')).find(btn => 
+        btn.offsetParent !== null && 
+        (btn.innerText.toLowerCase().includes('keluar') || 
+         btn.innerText.toLowerCase().includes('kembali') || 
+         btn.innerText.toLowerCase().includes('tutup'))
+    );
+
+    if (tombolKembaliLayar) {
+        tombolKembaliLayar.click(); // Eksekusi fungsi keluar bawaan antarmuka tersebut
+        return; // Hentikan eksekusi, biarkan layar kembali dengan natural
+    }
+
+    // 5. Kembali ke Dashboard HANYA jika sedang di menu lain (Data Siswa, dll) 
+    // Kita cek apakah menu yang aktif di sidebar saat ini BUKAN Dashboard
+    const menuAktif = document.querySelector('#sidebar .bg-emerald-600') || document.querySelector('#sidebar .active'); 
+    const teksMenu = menuAktif ? menuAktif.innerText.toLowerCase() : '';
+    
+    if (!teksMenu.includes('dashboard')) {
+        const tombolDashboard = document.querySelector('[onclick*="ashboard"]') || document.querySelector('[onclick*="home"]');
+        if (tombolDashboard) {
+            tombolDashboard.click();
+            return;
+        }
+    }
+
+    // 6. Logika 3x Swipe untuk EXIT MUTLAK (Hanya aktif jika Bapak sudah berada di Dashboard Utama)
+    hitungSwipeKeluar++;
+    if (hitungSwipeKeluar === 1) {
+        if (typeof showAlert === 'function') showAlert("Tahan", "Swipe kembali 2x lagi untuk keluar aplikasi.", "info");
+        resetHitungan();
+    } else if (hitungSwipeKeluar === 2) {
+        if (typeof showAlert === 'function') showAlert("Peringatan", "Swipe kembali 1x lagi untuk keluar.", "warning");
+        resetHitungan();
+    } else if (hitungSwipeKeluar >= 3) {
+        clearTimeout(timerSwipe);
+        hitungSwipeKeluar = 0; 
+        
+        // Peringatan terakhir sebelum aplikasi benar-benar dimatikan
+        if (confirm("Yakin Anda mau keluar dari aplikasi Smart Teacher?")) {
+            history.go(-2); // Izinkan browser menutup aplikasi
+        }
+    }
+
+    function resetHitungan() {
+        clearTimeout(timerSwipe);
+        timerSwipe = setTimeout(() => { hitungSwipeKeluar = 0; }, 4000); // Hitungan di-reset jika jeda swipe lebih dari 4 detik
     }
 });
