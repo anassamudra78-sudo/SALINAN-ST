@@ -873,87 +873,59 @@ async function tarikDataGateway(kelasId) {
     }
 }
 
-// --- SISTEM GESTUR KEMBALI MUTLAK (ANTI-TERLEMPAR) ---
+// ==========================================
+// MESIN NAVIGASI PROFESIONAL (HASH ROUTER)
+// ==========================================
 
-let hitungSwipeKeluar = 0;
-let timerSwipe = null;
-
-// 1. PERTAHANAN GANDA SAAT LOAD: Dorong 2 riwayat sekaligus agar browser tidak bisa langsung bablas
-window.addEventListener('load', function() {
-    history.pushState('penahan-awal', null, location.href);
-    history.pushState('penahan-aktif', null, location.href);
+// 1. Daftarkan URL saat aplikasi baru dibuka
+window.addEventListener('load', () => {
+    if (!window.location.hash) {
+        // Jika tidak ada URL, setel otomatis ke dashboard
+        window.history.replaceState(null, null, '#dashboard');
+    }
 });
 
-window.addEventListener('popstate', function(event) {
-    // 2. SUNTIKAN INSTAN: Detik pertama di-swipe, langsung isi kembali riwayatnya agar tumpukan tidak pernah habis!
-    history.pushState('penahan-aktif', null, location.href);
+// 2. DETEKSI SETIAP KALI USER MELAKUKAN SWIPE BACK ATAU GANTI MENU
+window.addEventListener('hashchange', function() {
+    const halamanTujuan = window.location.hash.replace('#', '');
+    
+    // Panggil fungsi eksekutor untuk merubah tampilan
+    renderHalaman(halamanTujuan);
+});
 
-    // 3. Tutup peringatan (SweetAlert) jika ada
-    if (typeof Swal !== 'undefined' && Swal.isVisible()) {
-        Swal.close();
-        return;
-    }
+// 3. FUNGSI EKSEKUTOR TAMPILAN (Satu komando untuk semua)
+function renderHalaman(halaman) {
+    // A. Pastikan semua peringatan/modal tertutup saat ganti layar
+    if (typeof Swal !== 'undefined' && Swal.isVisible()) Swal.close();
+    
+    // Tutup layar pop-up/modal (Misal: Modal Kamera, Form)
+    const modals = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+    modals.forEach(m => {
+        // Jangan tutup modal kalau ID-nya sama dengan halaman yang dituju
+        if(m.id !== halaman) m.classList.add('hidden'); 
+    });
 
-    // 4. Tutup Sidebar di HP (Tablet aman)
+    // B. Tutup Sidebar otomatis di HP
     const sidebar = document.getElementById('sidebar');
-    if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 1024) {
+    if (sidebar && window.innerWidth < 1024) {
         sidebar.classList.add('-translate-x-full');
-        return;
     }
 
-    // 5. Tutup Modal Pop-up (seperti form tambah siswa/kamera)
-    const modals = Array.from(document.querySelectorAll('.fixed.inset-0')).filter(m => !m.classList.contains('hidden') && m.style.display !== 'none');
-    if (modals.length > 0) {
-        modals[modals.length - 1].classList.add('hidden');
-        return;
-    }
-
-    // 6. KUNCI PROFESIONAL: Cari dan klik tombol Keluar/Kembali (Khusus Arena Kuis & Layar Interaktif)
-    const tombolKembaliLayar = Array.from(document.querySelectorAll('button')).find(btn => 
-        btn.offsetParent !== null && 
-        (btn.innerText.toLowerCase().includes('keluar') || 
-         btn.innerText.toLowerCase().includes('kembali') || 
-         btn.innerText.toLowerCase().includes('tutup'))
-    );
-
-    if (tombolKembaliLayar) {
-        tombolKembaliLayar.click(); // Eksekusi kembali ke menu sebelumnya secara natural
-        return; 
-    }
-
-    // 7. Kembali ke Dashboard jika sedang di menu lain (Data Siswa, Data Guru, dll)
-    const menuAktif = document.querySelector('#sidebar .bg-emerald-600') || document.querySelector('#sidebar .active'); 
-    const teksMenu = menuAktif ? menuAktif.innerText.toLowerCase() : '';
-    
-    if (!teksMenu.includes('dashboard')) {
-        const tombolDashboard = document.querySelector('[onclick*="ashboard"]') || document.querySelector('[onclick*="home"]');
-        if (tombolDashboard) {
-            tombolDashboard.click();
-            return;
-        }
-    }
-
-    // 8. LOGIKA EXIT 3X (Hanya berjalan jika Bapak sudah berada di Dashboard Utama)
-    hitungSwipeKeluar++;
-    
-    if (hitungSwipeKeluar === 1) {
-        if (typeof showAlert === 'function') showAlert("Tahan", "Swipe 2x lagi untuk keluar.", "info");
-        resetHitungan();
-    } else if (hitungSwipeKeluar === 2) {
-        if (typeof showAlert === 'function') showAlert("Peringatan", "Swipe 1x lagi untuk keluar.", "warning");
-        resetHitungan();
-    } else if (hitungSwipeKeluar >= 3) {
-        clearTimeout(timerSwipe);
-        hitungSwipeKeluar = 0; 
+    // C. LOGIKA PERPINDAHAN HALAMAN
+    if (halaman === 'dashboard') {
+        // Panggil fungsi Bapak untuk menampilkan dashboard
+        const btnDashboard = document.querySelector('[onclick*="ashboard"]');
+        if (btnDashboard) btnDashboard.click();
         
-        if (confirm("Yakin Anda mau keluar dari aplikasi Smart Teacher?")) {
-            // Izinkan browser menghancurkan semua penahan dan keluar
-            window.history.go(-3);
-        }
+    } else if (halaman === 'kuis') {
+        // Tampilkan layar persiapan kuis
+        const layarKuis = document.getElementById('quiz-arena-modal'); // Sesuaikan ID layar kuis Bapak
+        if(layarKuis) layarKuis.classList.remove('hidden');
+        
+    } else if (halaman === 'data-siswa') {
+        // Panggil fungsi Bapak untuk buka data siswa
+        const btnSiswa = document.querySelector('[onclick*="siswa"]');
+        if (btnSiswa) btnSiswa.click();
     }
-
-    function resetHitungan() {
-        clearTimeout(timerSwipe);
-        timerSwipe = setTimeout(() => { hitungSwipeKeluar = 0; }, 4000);
-    }
-});
+    // (Bapak bisa menambahkan else if untuk halaman lainnya sesuai kebutuhan)
+}
