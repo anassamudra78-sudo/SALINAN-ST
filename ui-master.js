@@ -872,3 +872,30 @@ async function tarikDataGateway(kelasId) {
         loadAbsensi(); 
     }
 }
+
+// Letakkan di baris paling bawah ui-master.js
+
+window.addEventListener('load', () => {
+    history.pushState({ modalTerbuka: false }, "", "");
+});
+
+window.addEventListener('popstate', (event) => {
+    history.pushState({ modalTerbuka: false }, "", "");
+
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+        sidebar.classList.add('-translate-x-full');
+        return; 
+    }
+
+    const modals = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+    if (modals.length > 0) {
+        modals.forEach(m => m.classList.add('hidden'));
+        return;
+    }
+
+    const btnDashboard = document.querySelector('[onclick*="dashboard"]');
+    if (btnDashboard) {
+        btnDashboard.click();
+    }
+});
