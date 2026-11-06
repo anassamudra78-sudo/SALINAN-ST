@@ -544,29 +544,49 @@ async function dapatkanModelAktif(apiKey) {
     return ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
 }
 
-async function panggilGeminiAntiGagal(prompt, systemInstruction = "") {
+async function panggilGeminiAntiGagal(prompt, systemInstruction = "", jsonSchema = null) {
     const apiKey = getActiveApiKey();
     if (!apiKey) throw new Error("API Key Gemini belum diisi. Masukkan API Key terlebih dahulu.");
+
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
     if (systemInstruction) payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+
+    if (jsonSchema) {
+        payload.generationConfig = {
+            responseMimeType: "application/json",
+            responseSchema: jsonSchema
+        };
+    }
+
     const daftarModel = await dapatkanModelAktif(apiKey);
     let pesanErrorTerakhir = "";
 
     for (const namaModel of daftarModel) {
         try {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${namaModel}:generateContent?key=${apiKey}`;
-            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
             const result = await response.json();
+
             if (result.error) {
                 pesanErrorTerakhir = result.error.message || "Gagal menghubungi model.";
-                if (result.error.code === 400 && result.error.message.includes("API key")) throw new Error("API Key tidak valid. Periksa kembali kunci API Anda.");
+                if (result.error.code === 400 && result.error.message.includes("API key")) {
+                    throw new Error("API Key tidak valid. Periksa kembali kunci API Anda.");
+                }
                 continue; 
             }
+
             if (result.candidates && result.candidates[0] && result.candidates[0].content) {
                 return result.candidates[0].content.parts[0].text;
             }
-        } catch (err) { pesanErrorTerakhir = err.message; }
+        } catch (err) {
+            pesanErrorTerakhir = err.message;
+        }
     }
+
     throw new Error(pesanErrorTerakhir || "Seluruh model yang tersedia gagal memberikan respon.");
 }
 
@@ -635,36 +655,55 @@ async function runAIKuis() {
     if(!topik) return showAlert('Peringatan', 'Isi topik kuis terlebih dahulu.', 'error');
 
     const btn = document.getElementById('btn-kuis');
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i>Meracik Soal & Membuka Arena...`;
+    // Teks tombol diubah jadi "Cepat" untuk penanda bahwa kode baru sudah jalan
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i>Meracik Soal Cepat...`;
     btn.disabled = true;
+
     const resDiv = document.getElementById('ai-result');
 
     try {
-        const promptKuis = `Buatkan kuis pilihan ganda tentang "${topik}" sebanyak ${jumlah} soal. KEMBALIKAN HANYA FORMAT ARRAY JSON MURNI! Tanpa penjelasan apapun, tanpa markdown pembungkus. Contoh format: [{"soal": "Pertanyaan?", "opsi": ["A", "B", "C", "D"], "jawaban_benar_index": 0}]`;
-        const rawText = await panggilGeminiAntiGagal(promptKuis);
+        const promptKuis = `Buatkan kuis pilihan ganda edukatif tentang: "${topik}" sebanyak ${jumlah} soal.`;
+        
+        // Cetakan JSON untuk Mode Turbo
+        const skemaJsonTurbo = {
+            type: "ARRAY",
+            description: "Daftar soal kuis",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    soal: { type: "STRING", description: "Teks pertanyaan" },
+                    opsi: { type: "ARRAY", items: { type: "STRING" }, description: "4 pilihan jawaban" },
+                    jawaban_benar_index: { type: "INTEGER", description: "Index kunci jawaban dari 0 sampai 3" }
+                },
+                required: ["soal", "opsi", "jawaban_benar_index"]
+            }
+        };
+
+        // Memanggil Gemini Anti Gagal + Jalur Turbo
+        const rawText = await panggilGeminiAntiGagal(promptKuis, "", skemaJsonTurbo);
 
         btn.innerHTML = `<i class="fa-solid fa-bolt mr-2"></i>Generate & Luncurkan Arena Kuis!`;
         btn.disabled = false;
 
-        let cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const jsonMatch = cleanJson.match(/\[\s*\{[\s\S]*\}\s*\]/);
-        if (jsonMatch) cleanJson = jsonMatch[0];
-        else {
-            let awal = cleanJson.indexOf('[');
-            let akhir = cleanJson.lastIndexOf(']') + 1;
-            if(awal !== -1 && akhir !== 0) cleanJson = cleanJson.substring(awal, akhir);
-        }
+        const generatedQuestions = JSON.parse(rawText);
+        
+        const finalQuestions = generatedQuestions.map(q => ({
+            id: generateId(),
+            soal: q.soal,
+            opsi: q.opsi,
+            jawaban_benar_index: q.jawaban_benar_index
+        }));
 
-        const generatedQuestions = JSON.parse(cleanJson);                
-        AppState.kuis.bankSoalManual.push(...generatedQuestions);
-        simpanKeLocalStorage();
+        AppState.kuis.bankSoalManual.push(...finalQuestions);
+        if (typeof simpanKeLocalStorage === 'function') simpanKeLocalStorage();
 
         resDiv.classList.add('hidden');
-        bukaArenaKuis(generatedQuestions, true);
+        bukaArenaKuis(finalQuestions, true);
+
     } catch (e) {
         btn.innerHTML = `<i class="fa-solid fa-bolt mr-2"></i>Generate & Luncurkan Arena Kuis!`;
         btn.disabled = false;
-        resDiv.innerHTML = `<div class="bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 p-4 rounded-xl border border-rose-200 dark:border-rose-800"><p class="font-bold">Pesan Gemini AI:</p><p class="text-xs mt-1 font-mono">${e.message}</p></div>`;
+        resDiv.innerHTML = `<div class="bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 p-4 rounded-xl border border-rose-200 dark:border-rose-800"><p class="font-bold">Gagal Generate:</p><p class="text-xs mt-1 font-mono">${e.message}</p></div>`;
         resDiv.classList.remove('hidden');
     }
 }
