@@ -714,6 +714,7 @@ async function runAITpAtp() {
     const btn = document.getElementById('btn-tp');
     const resDiv = document.getElementById('ai-result');
     const actDiv = document.getElementById('ai-actions');
+    
     let promptDasar = "";
     
     if (mode === 'mandiri') {
@@ -721,42 +722,104 @@ async function runAITpAtp() {
         const fase = document.getElementById('ai-fase-tp').value;
         const topik = document.getElementById('ai-topik-tp').value;
         const jp = document.getElementById('ai-jp-tp').value;
+        
         if(!mapel || !fase || !topik || !jp) return showAlert('Peringatan', 'Isi semua kolom Mode Mandiri.', 'error');
-        promptDasar = `Buatkan rumusan Capaian Pembelajaran (CP) secara mandiri, lalu turunkan menjadi Tujuan Pembelajaran (TP) dan Alur Tujuan Pembelajaran (ATP) untuk:\nMapel: ${mapel}\nFase:${fase}\nTopik: ${topik}\nAlokasi:${jp} JP.`;
+        promptDasar = `Buatkan Tujuan Pembelajaran (TP) dan Alur Tujuan Pembelajaran (ATP) untuk:\nMapel: ${mapel}\nFase:${fase}\nTopik: ${topik}\nAlokasi:${jp} JP.`;
     } else {
         const cp = document.getElementById('ai-cp-resmi').value;
         const topik = document.getElementById('ai-topik-resmi').value;
         const jp = document.getElementById('ai-jp-resmi').value;
+        
         if(!cp || !topik || !jp) return showAlert('Peringatan', 'Isi teks CP, Topik, dan Alokasi JP.', 'error');
-        promptDasar = `Berdasarkan teks Capaian Pembelajaran (CP) Resmi ini:\n"${cp}"\n\nBedah dan turunkan CP tersebut menjadi Tujuan Pembelajaran (TP) dan Alur Tujuan Pembelajaran (ATP) khusus untuk Topik: ${topik}, dengan Alokasi:${jp} JP.`;
+        promptDasar = `Berdasarkan teks CP:\n"${cp}"\n\nBedah menjadi TP dan ATP khusus untuk Topik: ${topik}, Alokasi:${jp} JP.`;
     }
 
-    const prompt = `${promptDasar}\nINSTRUKSI WAJIB: 1. Output TABEL HTML murni. 2. Kolom 1 (Tujuan Pembelajaran & JP), Kolom 2 (Alur Pembelajaran) ${cekPID ? ', Kolom 3 (Skenario PID)' : ''}. 3. Tanpa markdown.`;
+    // Perintah disederhanakan karena format sudah diikat mutlak oleh JSON
+    const prompt = `${promptDasar}\nBagi materi menjadi 4 hingga 6 tahapan logis. Jawab dengan padat, berbobot, dan esensial.`;
 
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i>Merumuskan ATP...`;
+    // SKEMA JALUR TURBO KHUSUS ATP (Memaksa AI merespon dengan data mentah super kilat)
+    const skemaAtpTurbo = {
+        type: "OBJECT",
+        properties: {
+            baris_tabel: {
+                type: "ARRAY",
+                description: "Daftar baris untuk tabel ATP",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        tujuan_dan_jp: { type: "STRING", description: "Tujuan pembelajaran dan alokasi JP" },
+                        alur_pentahapan: { type: "STRING", description: "Aktivitas alur pembelajaran" },
+                        skenario_pid: { type: "STRING", description: "Ide penggunaan Papan Interaktif Digital (Kosongkan jika tidak diminta)" }
+                    },
+                    required: ["tujuan_dan_jp", "alur_pentahapan", "skenario_pid"]
+                }
+            }
+        }
+    };
+
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i>Merumuskan ATP Kilat...`;
     btn.disabled = true;
     resDiv.classList.add('hidden');
     if(actDiv) actDiv.classList.add('hidden');
 
-    const res = await askGemini(prompt);
-    
-    btn.innerHTML = `<i class="fa-solid fa-layer-group mr-2"></i> Generate ATP (Deep Learning)`;
-    btn.disabled = false;
-    resDiv.innerHTML = res.replace(/```html/gi, '').replace(/```/g, '').trim();
-    resDiv.classList.remove('hidden');
+    try {
+        // Tembak menggunakan mesin Anti Gagal + Skema Turbo
+        const rawText = await panggilGeminiAntiGagal(prompt, "", skemaAtpTurbo);
+        
+        // Ekstrak data mentah JSON
+        const data = JSON.parse(rawText);
 
-    if(actDiv) {
-        document.getElementById('super-app-buttons').innerHTML = `
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button onclick="generateSuperApp('promes')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1"><i class="fa-solid fa-calendar-week mr-2"></i> Sulap jadi PROMES</button>
-                <button onclick="generateSuperApp('rpp')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1"><i class="fa-solid fa-book-open mr-2"></i> Sulap Modul Ajar/RPP</button>
-                <button onclick="generateSuperApp('lkpd')" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1"><i class="fa-solid fa-file-pen mr-2"></i> Sulap jadi LKPD</button>
-            </div>
-        `;
-        actDiv.classList.remove('hidden');
+        // JavaScript yang merakit tabel HTML seketika!
+        // Menggunakan gaya inline agar sangat mulus saat di-download ke Microsoft Word
+        let tableHtml = `<table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-top: 10px; margin-bottom: 10px; text-align: left; font-size: 14px;">
+            <thead style="background-color: #f1f5f9;">
+                <tr>
+                    <th style="border: 1px solid #cbd5e1; padding: 12px;">Tujuan Pembelajaran & JP</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 12px;">Alur Pentahapan</th>
+                    ${cekPID ? '<th style="border: 1px solid #cbd5e1; padding: 12px;">Skenario PID</th>' : ''}
+                </tr>
+            </thead>
+            <tbody>`;
+            
+        data.baris_tabel.forEach(item => {
+            tableHtml += `<tr>
+                <td style="border: 1px solid #cbd5e1; padding: 12px; vertical-align: top;">${item.tujuan_dan_jp}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 12px; vertical-align: top;">${item.alur_pentahapan}</td>
+                ${cekPID ? `<td style="border: 1px solid #cbd5e1; padding: 12px; vertical-align: top;">${item.skenario_pid}</td>` : ''}
+            </tr>`;
+        });
+        tableHtml += `</tbody></table>`;
+
+        // Tampilkan hasil secara instan
+        resDiv.innerHTML = tableHtml;
+        resDiv.classList.remove('hidden');
+
+        // Tampilkan tombol lanjutan (Super App)
+        if(actDiv) {
+            document.getElementById('super-app-buttons').innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button onclick="generateSuperApp('promes')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1">
+                        <i class="fa-solid fa-calendar-week mr-2"></i> Sulap jadi PROMES
+                    </button>
+                    <button onclick="generateSuperApp('rpp')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1">
+                        <i class="fa-solid fa-book-open mr-2"></i> Sulap Modul Ajar/RPP
+                    </button>
+                    <button onclick="generateSuperApp('lkpd')" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center transition-all hover:-translate-y-1">
+                        <i class="fa-solid fa-file-pen mr-2"></i> Sulap jadi LKPD
+                    </button>
+                </div>
+            `;
+            actDiv.classList.remove('hidden');
+        }
+
+    } catch (e) {
+        resDiv.innerHTML = `<div class="p-4 bg-rose-100 text-rose-700 rounded-xl font-bold border border-rose-300">Gagal: ${e.message}</div>`;
+        resDiv.classList.remove('hidden');
+    } finally {
+        btn.innerHTML = `<i class="fa-solid fa-layer-group mr-2"></i> Generate ATP (Deep Learning)`;
+        btn.disabled = false;
     }
 }
-
 async function generateSuperApp(jenis) {
     const resDiv = document.getElementById('ai-result');
     const atpData = resDiv.innerText; 
