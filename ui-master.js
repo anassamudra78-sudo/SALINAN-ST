@@ -873,29 +873,36 @@ async function tarikDataGateway(kelasId) {
     }
 }
 
-// Letakkan di baris paling bawah ui-master.js
+// --- PENCEGAT SWIPE BACK (ANTI KELUAR APLIKASI) ---
 
-window.addEventListener('load', () => {
-    history.pushState({ modalTerbuka: false }, "", "");
-});
+// 1. Tanamkan satu riwayat penahan saat aplikasi pertama kali dimuat
+history.pushState(null, null, location.href);
 
-window.addEventListener('popstate', (event) => {
-    history.pushState({ modalTerbuka: false }, "", "");
+// 2. Tangkap gestur usap/tombol kembali
+window.addEventListener('popstate', function(event) {
+    
+    // KUNCI UTAMA: Langsung paksa browser maju lagi 1 langkah agar riwayat tidak habis (anti-keluar)
+    history.go(1); 
 
+    let aksiPenutupan = false;
+
+    // A. Tutup Sidebar jika sedang terbuka
     const sidebar = document.getElementById('sidebar');
     if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
         sidebar.classList.add('-translate-x-full');
-        return; 
+        aksiPenutupan = true;
     }
 
+    // B. Tutup Modal / Layar Pop-up jika ada yang terbuka
     const modals = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
     if (modals.length > 0) {
         modals.forEach(m => m.classList.add('hidden'));
-        return;
+        aksiPenutupan = true;
     }
 
-    const btnDashboard = document.querySelector('[onclick*="dashboard"]');
-    if (btnDashboard) {
-        btnDashboard.click();
+    // C. Jika layar sedang bersih (tidak ada menu/modal terbuka), kembalikan ke Dashboard Utama
+    if (!aksiPenutupan) {
+        const btnDashboard = document.querySelector('[onclick*="dashboard"]'); // Sesuaikan pemanggil dashboard
+        if (btnDashboard) btnDashboard.click();
     }
 });
