@@ -803,58 +803,78 @@ window.addEventListener('load', () => {
     history.replaceState({ tab: 'dashboard', type: 'halaman' }, "", "#dashboard");
 });
 
-// 2. Mesin Pencegat Swipe Back / Tombol Kembali Android
+// 2. Mesin Pencegat Swipe Back / Tombol Kembali Android (VERSI FINAL HASH)
 window.addEventListener('popstate', (event) => {
-    // A. PRIORITAS 1: Tutup Modal / Layar Penuh (Seperti Arena Kuis atau Form Import)
-    const modalsTerbuka = Array.from(document.querySelectorAll('.fixed.inset-0')).filter(m => !m.classList.contains('hidden') && m.style.display !== 'none');
     
-    // Abaikan layar preloader dan layar login dari deteksi ini
-    const modalsValid = modalsTerbuka.filter(m => m.id !== 'app-preloader' && m.id !== 'login-screen');
+    // A. DAFTAR SUB-MODAL (Pop-up yang menumpuk di atas layar)
+    const subModals = [
+        'bank-soal-modal', 'audio-settings-modal', 'bedah-soal-modal', 
+        'import-modal', 'notification-modal', 'setup-db-modal', 
+        'modal-workspace', 'qr-modal-scanner', 'qr-modal-tampil', 'guide-modal'
+    ];
     
-    if (modalsValid.length > 0) {
-        // Hentikan swipe back agar aplikasi tidak keluar
-        history.pushState(null, "", location.href); 
-        
-        // Cek secara spesifik jika yang terbuka adalah Arena Kuis
-        const arenaKuis = document.getElementById('quiz-arena-modal');
-        if (arenaKuis && !arenaKuis.classList.contains('hidden')) {
-            keluarArenaKuis(); // Panggil fungsi resmi dari ui-kuis.js
-            return;
+    let subModalTertutup = false;
+    
+    // Cek dan tutup HANYA SATU sub-modal yang sedang terbuka
+    for (let i = 0; i < subModals.length; i++) {
+        const el = document.getElementById(subModals[i]);
+        if (el && !el.classList.contains('hidden') && el.style.display !== 'none') {
+            el.classList.add('hidden');
+            subModalTertutup = true;
+            break; 
         }
-
-        // Tutup modal paling atas secara umum
-        modalsValid[modalsValid.length - 1].classList.add('hidden');
-        return;
     }
 
-    // B. PRIORITAS 2: Tutup Laci Samping (Edge Panel / Sidebar Mobile)
+    // B. KENDALI SWIPE BACK KHUSUS ARENA KUIS (LAYAR PENUH)
+    const arenaKuis = document.getElementById('quiz-arena-modal');
+    let arenaKuisTertutup = false;
+    
+    if (!subModalTertutup && arenaKuis && !arenaKuis.classList.contains('hidden')) {
+        if (confirm('Yakin ingin menghentikan dan keluar dari Arena Kuis?')) {
+            if (typeof stopBGM === 'function') stopBGM();
+            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+            if(exit && document.fullscreenElement) exit.call(document).catch(e => {});
+            
+            arenaKuis.classList.add('hidden');
+            arenaKuisTertutup = true;
+        } else {
+            // BATAL KELUAR: Suntik ulang riwayat kuis agar tidak jebol keluar
+            history.pushState(null, "", "#arena-kuis");
+            return;
+        }
+    }
+
+    // C. TUTUP LACI (SIDEBAR MOBILE / EDGE PANEL)
     const sidebar = document.getElementById('mobile-drawer');
     const edgePanel = document.getElementById('edge-panel');
     let menutupLaci = false;
 
-    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
-        toggleMobileMenu(true); // Panggil fungsi resmi dari ui.js
-        menutupLaci = true;
-    }
-    if (edgePanel && edgePanel.classList.contains('translate-x-0')) {
-        toggleEdgePanel(); // Panggil fungsi resmi dari ui.js
-        menutupLaci = true;
-    }
-
-    if (menutupLaci) {
-        history.pushState(null, "", location.href);
-        return;
-    }
-
-    // C. PRIORITAS 3: Mundur ke Halaman Sebelumnya
-    if (event.state && event.state.type === 'halaman') {
-        // Jika kembali ke halaman utama, gunakan parameter true agar tidak mencatat riwayat ganda
-        switchTab(event.state.tab, true);
-    } else {
-        // D. PRIORITAS TERAKHIR: Konfirmasi Keluar jika sudah diujung riwayat
-        const yakinKeluar = confirm("Yakin Anda mau keluar dari aplikasi Smart Teacher?");
-        if (!yakinKeluar) {
-            history.pushState({ tab: AppState.ui.activeTab, type: 'halaman' }, "", "#" + AppState.ui.activeTab); 
+    if (!subModalTertutup && !arenaKuisTertutup) {
+        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+            if (typeof toggleMobileMenu === 'function') toggleMobileMenu(true);
+            menutupLaci = true;
         }
+        if (edgePanel && edgePanel.classList.contains('translate-x-0')) {
+            if (typeof toggleEdgePanel === 'function') toggleEdgePanel();
+            menutupLaci = true;
+        }
+    }
+
+    // --- KUNCI PENAHAN MULTI-LAPIS ---
+    // Jika barusan menutup Sub-Modal atau Laci, TAHAN layar di halaman saat ini
+    if (subModalTertutup || arenaKuisTertutup || menutupLaci) {
+        history.pushState(null, "", "#" + AppState.ui.activeTab);
+        return; 
+    }
+
+    // D. NAVIGASI HALAMAN MENGGUNAKAN HASH URL (ANTI-GAGAL)
+    const hash = window.location.hash.replace('#', '');
+    
+    if (hash === 'dashboard' || !hash) {
+        switchTab('dashboard', true); // Kembali ke dashboard dengan aman
+    } else if (hash && typeof menuItems !== 'undefined' && menuItems.some(m => m.id === hash)) {
+        switchTab(hash, true); // Kembali ke menu riwayat sebelumnya
+    } else {
+        switchTab('dashboard', true); // Fallback mutlak
     }
 });
