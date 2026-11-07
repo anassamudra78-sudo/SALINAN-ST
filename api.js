@@ -232,3 +232,55 @@ function simpanKeLocalStorage() {
     if (countEl) countEl.innerText = AppState.kuis.bankSoalManual.length;
     if (infoTotal) infoTotal.innerText = AppState.kuis.bankSoalManual.length;
 }
+
+// ==========================================================
+// MESIN PENDETEKSI MASTER LINK & FUNGSI SALIN
+// ==========================================================
+
+// 1. Fungsi untuk mencetak dan menyalin Master Link
+function salinMasterLink() {
+    let dataWs = localStorage.getItem('ST_WORKSPACES');
+    if (!dataWs || dataWs === "[]") return alert("Belum ada ruang kerja yang bisa disalin.");
+    
+    // Membungkus data sekolah jadi satu sandi rahasia (Base64)
+    let encodedData = btoa(encodeURIComponent(dataWs)); 
+    let masterLink = window.location.href.split('?')[0] + "?master=" + encodedData;
+    
+    try {
+        navigator.clipboard.writeText(masterLink).then(() => {
+            alert("MASTER LINK BERHASIL DISALIN!\n\nSimpan link ini (misal di Chat WhatsApp/Notes). Jika sewaktu-waktu cache HP terhapus, cukup klik link ini dan SEMUA ruang kerja Bapak akan kembali utuh dalam 1 detik!");
+        });
+    } catch(err) {
+        prompt("Sistem memblokir copy otomatis. Salin manual teks di bawah ini:", masterLink);
+    }
+}
+
+// 2. Mesin Pendeteksi Master Link saat aplikasi baru dibuka
+const urlParams = new URLSearchParams(window.location.search);
+const masterData = urlParams.get('master');
+
+if (masterData) {
+    try {
+        // Menerjemahkan sandi Master Link menjadi data ruang kerja
+        let decodedData = decodeURIComponent(atob(masterData));
+        let parsedWs = JSON.parse(decodedData);
+        
+        if (Array.isArray(parsedWs) && parsedWs.length > 0) {
+            // Suntikkan kembali ruang kerja ke dalam HP
+            localStorage.setItem('ST_WORKSPACES', JSON.stringify(parsedWs));
+            localStorage.setItem('ST_ACTIVE_WS_ID', parsedWs[0].id);
+            localStorage.setItem('ST_GAS_URL', parsedWs[0].url || "");
+            
+            if (typeof AppState !== 'undefined') {
+                AppState.config.gasUrl = parsedWs[0].url || "";
+            }
+            
+            // Bersihkan URL bar agar tetap rapi
+            window.history.replaceState({}, document.title, window.location.pathname);
+            alert("Ajaib! " + parsedWs.length + " Ruang Kerja berhasil dipulihkan secara otomatis.");
+            window.location.reload();
+        }
+    } catch(e) {
+        console.error("Link master tidak valid/rusak.");
+    }
+}
