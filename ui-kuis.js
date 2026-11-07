@@ -757,6 +757,10 @@ function mulaiKuisSebenarnya() {
     const durasiEl = document.getElementById('lobby-durasi');
     AppState.kuis.durasiPilihan = durasiEl ? parseInt(durasiEl.value) : 15;
 
+    // --- TAMBAHKAN 2 BARIS INI ---
+    const kategoriEl = document.getElementById('kategoriPenilaian');
+    AppState.kuis.kategoriPenilaian = kategoriEl ? kategoriEl.value : "";
+    // -----------------------------
     if (AppState.kuis.modeKuis === 'single') {
         const siswaId = document.getElementById('lobby-siswa').value;
         const manualName = document.getElementById('lobby-manual').value.trim();
@@ -1043,13 +1047,15 @@ function renderKuisPlayer(index, score) {
             let sA = AppState.kuis.scorePemainA;
             let sB = AppState.kuis.scorePemainB;
 
-            if (AppState.kuis.pemainA_Id && AppState.kuis.kelasAktif) {
-                AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.pemainA_Id, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: 'Duel', nilai: sA, timestamp: Date.now() });
-            }
-            if (AppState.kuis.pemainB_Id && AppState.kuis.kelasAktif) {
-                AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.pemainB_Id, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: 'Duel', nilai: sB, timestamp: Date.now() });
-            }
-            saveDatabase();
+           if (AppState.kuis.kategoriPenilaian !== "") {
+                        if (AppState.kuis.pemainA_Id && AppState.kuis.kelasAktif) {
+                            AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.pemainA_Id, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: AppState.kuis.kategoriPenilaian, nilai: sA, timestamp: Date.now() });
+                        }
+                        if (AppState.kuis.pemainB_Id && AppState.kuis.kelasAktif) {
+                            AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.pemainB_Id, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: AppState.kuis.kategoriPenilaian, nilai: sB, timestamp: Date.now() });
+                        }
+                        saveDatabase();
+                    }
 
             let pemenangText = sA > sB ? `🏆 ${AppState.kuis.namaPemainA} MENANG!` : (sB > sA ? `🏆 ${AppState.kuis.namaPemainB} MENANG!` : "🤝 HASIL SERI!");
 
@@ -1096,18 +1102,21 @@ function renderKuisPlayer(index, score) {
         let nilaiAkhir = total > 0 ? Math.round((score / total) * 100) : 0;
         if (nilaiAkhir > 100) nilaiAkhir = 100;
         
-        let statusSimpan = `<p class="text-amber-300 font-bold mb-6 text-xs sm:text-sm"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Bermain tanpa akun terdaftar. Nilai tidak direkap ke leger.</p>`;
+       let statusSimpan = `<p class="text-amber-300 font-bold mb-6 text-xs sm:text-sm"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Bermain tanpa akun terdaftar. Nilai tidak direkap ke leger.</p>`;
         
-        if (AppState.kuis.siswaAktif && AppState.kuis.mapelAktif && AppState.kuis.kelasAktif) {
-            let existingIndex = AppState.db.penilaian.findIndex(p => p.siswaId === AppState.kuis.siswaAktif && p.mapelId === AppState.kuis.mapelAktif && p.jenis === 'Tugas');
+        if (AppState.kuis.kategoriPenilaian === "") {
+            statusSimpan = `<p class="text-amber-300 font-bold mb-6 text-xs sm:text-sm"><i class="fa-solid fa-gamepad mr-1"></i> Mode Latihan Saja. Nilai kuis tidak dimasukkan ke database rapor.</p>`;
+        } else if (AppState.kuis.siswaAktif && AppState.kuis.mapelAktif && AppState.kuis.kelasAktif) {
+            let existingIndex = AppState.db.penilaian.findIndex(p => p.siswaId === AppState.kuis.siswaAktif && p.mapelId === AppState.kuis.mapelAktif && p.jenis === AppState.kuis.kategoriPenilaian);
+            
             if(existingIndex >= 0) {
                 AppState.db.penilaian[existingIndex].nilai = nilaiAkhir;
                 AppState.db.penilaian[existingIndex].timestamp = Date.now();
             } else {
-                AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.siswaAktif, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: 'Tugas', nilai: nilaiAkhir, timestamp: Date.now() });
+                AppState.db.penilaian.push({ id: generateId(), siswaId: AppState.kuis.siswaAktif, mapelId: AppState.kuis.mapelAktif, kelasId: AppState.kuis.kelasAktif, jenis: AppState.kuis.kategoriPenilaian, nilai: nilaiAkhir, timestamp: Date.now() });
             }
             saveDatabase(); 
-            statusSimpan = `<p class="text-emerald-300 font-bold mb-6 text-xs sm:text-sm"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Nilai <b>${nilaiAkhir}</b> berhasil direkap otomatis ke Daftar Nilai Akademik.</p>`;
+            statusSimpan = `<p class="text-emerald-300 font-bold mb-6 text-xs sm:text-sm"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> Nilai <b>${nilaiAkhir}</b> sukses direkap ke <b>${AppState.kuis.kategoriPenilaian}</b>.</p>`;
         }
 
         const Kinerja = dapatkanPredikatKinerja(nilaiAkhir);
