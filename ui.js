@@ -796,85 +796,98 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// ui.js - Taruh di baris paling bawah
+// ==============================================================
+// MESIN NAVIGASI PWA KELAS ENTERPRISE (AUTO-TRACKER)
+// ==============================================================
 
-// 1. Catat Dashboard saat aplikasi pertama kali dimuat
-window.addEventListener('load', () => {
-    history.replaceState({ tab: 'dashboard', type: 'halaman' }, "", "#dashboard");
+// 1. OBSERVER OTOMATIS: Mencatat riwayat setiap ada layar/modal yang terbuka
+const modalObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const el = mutation.target;
+            
+            // Hanya pantau elemen jendela penuh (class fixed & inset-0)
+            if (el.classList && el.classList.contains('fixed') && el.classList.contains('inset-0')) {
+                const wasHidden = mutation.oldValue ? mutation.oldValue.includes('hidden') : false;
+                const isHiddenNow = el.classList.contains('hidden');
+                
+                // JANGAN pantau loading awal dan login
+                if (el.id !== 'app-preloader' && el.id !== 'login-screen') {
+                    // Jika layar BARU SAJA terbuka, otomatis suntik URL riwayat
+                    if (wasHidden && !isHiddenNow) {
+                        history.pushState({ modalId: el.id }, "", "#" + el.id);
+                    }
+                }
+            }
+        }
+    });
 });
 
-// 2. Mesin Pencegat Swipe Back / Tombol Kembali Android (VERSI FINAL HASH)
+// Hidupkan radar pemantau saat aplikasi dimuat
+window.addEventListener('load', () => {
+    history.replaceState({ tab: 'dashboard', type: 'halaman' }, "", "#dashboard");
+    
+    modalObserver.observe(document.body, { 
+        attributes: true, 
+        attributeFilter: ['class'], 
+        attributeOldValue: true, 
+        subtree: true 
+    });
+});
+
+// 2. MESIN PENCEGAT SWIPE BACK (Sesuai Permintaan: LANGSUNG TUTUP TANPA PERINGATAN)
 window.addEventListener('popstate', (event) => {
     
-    // A. DAFTAR SUB-MODAL (Pop-up yang menumpuk di atas layar)
-    const subModals = [
-        'bank-soal-modal', 'audio-settings-modal', 'bedah-soal-modal', 
-        'import-modal', 'notification-modal', 'setup-db-modal', 
-        'modal-workspace', 'qr-modal-scanner', 'qr-modal-tampil', 'guide-modal'
-    ];
-    
-    let subModalTertutup = false;
-    
-    // Cek dan tutup HANYA SATU sub-modal yang sedang terbuka
-    for (let i = 0; i < subModals.length; i++) {
-        const el = document.getElementById(subModals[i]);
-        if (el && !el.classList.contains('hidden') && el.style.display !== 'none') {
-            el.classList.add('hidden');
-            subModalTertutup = true;
-            break; 
-        }
-    }
+    // Cari semua layar tumpuk yang SEDANG TERBUKA
+    const modalsTerbuka = Array.from(document.querySelectorAll('.fixed.inset-0')).filter(m => 
+        !m.classList.contains('hidden') && 
+        m.style.display !== 'none' && 
+        m.id !== 'app-preloader' && 
+        m.id !== 'login-screen'
+    );
 
-    // B. KENDALI SWIPE BACK KHUSUS ARENA KUIS (LAYAR PENUH)
-    const arenaKuis = document.getElementById('quiz-arena-modal');
-    let arenaKuisTertutup = false;
-    
-    if (!subModalTertutup && arenaKuis && !arenaKuis.classList.contains('hidden')) {
-        if (confirm('Yakin ingin menghentikan dan keluar dari Arena Kuis?')) {
+    // A. JIKA ADA LAYAR TERBUKA, TUTUP YANG PALING ATAS
+    if (modalsTerbuka.length > 0) {
+        // Ambil layar yang menumpuk paling atas
+        const modalTeratas = modalsTerbuka[modalsTerbuka.length - 1];
+        
+        // Khusus jika yang ditutup adalah Arena Kuis: matikan lagu & keluar fullscreen
+        if (modalTeratas.id === 'quiz-arena-modal') {
             if (typeof stopBGM === 'function') stopBGM();
             const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
             if(exit && document.fullscreenElement) exit.call(document).catch(e => {});
-            
-            arenaKuis.classList.add('hidden');
-            arenaKuisTertutup = true;
-        } else {
-            // BATAL KELUAR: Suntik ulang riwayat kuis agar tidak jebol keluar
-            history.pushState(null, "", "#arena-kuis");
-            return;
         }
+        
+        // Sembunyikan layar tersebut SECARA INSTAN TANPA PERINGATAN "Yakin Keluar"
+        modalTeratas.classList.add('hidden');
+        return; // Hentikan eksekusi, biarkan user kembali menikmati layar di bawahnya
     }
 
-    // C. TUTUP LACI (SIDEBAR MOBILE / EDGE PANEL)
+    // B. TUTUP LACI (SIDEBAR MOBILE / EDGE PANEL)
     const sidebar = document.getElementById('mobile-drawer');
     const edgePanel = document.getElementById('edge-panel');
     let menutupLaci = false;
 
-    if (!subModalTertutup && !arenaKuisTertutup) {
-        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
-            if (typeof toggleMobileMenu === 'function') toggleMobileMenu(true);
-            menutupLaci = true;
-        }
-        if (edgePanel && edgePanel.classList.contains('translate-x-0')) {
-            if (typeof toggleEdgePanel === 'function') toggleEdgePanel();
-            menutupLaci = true;
-        }
+    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+        if (typeof toggleMobileMenu === 'function') toggleMobileMenu(true);
+        menutupLaci = true;
     }
-
-    // --- KUNCI PENAHAN MULTI-LAPIS ---
-    // Jika barusan menutup Sub-Modal atau Laci, TAHAN layar di halaman saat ini
-    if (subModalTertutup || arenaKuisTertutup || menutupLaci) {
-        history.pushState(null, "", "#" + AppState.ui.activeTab);
-        return; 
+    if (edgePanel && edgePanel.classList.contains('translate-x-0')) {
+        if (typeof toggleEdgePanel === 'function') toggleEdgePanel();
+        menutupLaci = true;
     }
-
-    // D. NAVIGASI HALAMAN MENGGUNAKAN HASH URL (ANTI-GAGAL)
-    const hash = window.location.hash.replace('#', '');
     
+    if (menutupLaci) {
+        // Karena laci bukan URL, tahan riwayat agar aplikasi tidak keluar
+        history.pushState(null, "", "#" + AppState.ui.activeTab);
+        return;
+    }
+
+    // C. JIKA LAYAR BERSIH, KEMBALI KE MENU SEBELUMNYA (DASHBOARD)
+    const hash = window.location.hash.replace('#', '');
     if (hash === 'dashboard' || !hash) {
-        switchTab('dashboard', true); // Kembali ke dashboard dengan aman
+        if (AppState.ui.activeTab !== 'dashboard') switchTab('dashboard', true);
     } else if (hash && typeof menuItems !== 'undefined' && menuItems.some(m => m.id === hash)) {
-        switchTab(hash, true); // Kembali ke menu riwayat sebelumnya
-    } else {
-        switchTab('dashboard', true); // Fallback mutlak
+        switchTab(hash, true);
     }
 });
