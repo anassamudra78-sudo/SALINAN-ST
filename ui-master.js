@@ -320,7 +320,23 @@ function renderPenilaian(container) {
                  <select id="penilaian-mapel" onchange="loadFormPenilaian()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 dark:text-white"><option value="">-- Pilih --</option>${mapelOpts}</select></div>
             <div><label class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1.5">Jenis Penilaian</label>
                  <select id="penilaian-jenis" onchange="loadFormPenilaian()" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 dark:text-white">
-                     <option value="Tugas">Tugas</option><option value="UTS">UTS</option><option value="UAS">UAS</option>
+                     <option value="" disabled selected>-- Pilih Jenis Penilaian --</option>
+<option value="Tugas TP 1">Tugas (TP/Bab 1)</option>
+<option value="Sumatif TP 1">Sumatif (TP/Bab 1)</option>
+<option value="Tugas TP 2">Tugas (TP/Bab 2)</option>
+<option value="Sumatif TP 2">Sumatif (TP/Bab 2)</option>
+<option value="Tugas TP 3">Tugas (TP/Bab 3)</option>
+<option value="Sumatif TP 3">Sumatif (TP/Bab 3)</option>
+<option value="Tugas TP 4">Tugas (TP/Bab 4)</option>
+<option value="Sumatif TP 4">Sumatif (TP/Bab 4)</option>
+<option value="Tugas TP 5">Tugas (TP/Bab 5)</option>
+<option value="Sumatif TP 5">Sumatif (TP/Bab 5)</option>
+<option value="Tugas TP 6">Tugas (TP/Bab 6)</option>
+<option value="Sumatif TP 6">Sumatif (TP/Bab 6)</option>
+<option value="Tugas TP 7">Tugas (TP/Bab 7)</option>
+<option value="Sumatif TP 7">Sumatif (TP/Bab 7)</option>
+<option value="STS">STS (Sumatif Tengah Semester)</option>
+<option value="SAS">SAS (Sumatif Akhir Semester)</option>
                  </select></div>
         </div>
         <div id="penilaian-form-container"></div>
