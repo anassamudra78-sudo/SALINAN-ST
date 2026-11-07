@@ -651,7 +651,28 @@ function bukaArenaKuis(soalArray, isNewSession = true) {
                         </div>
                     </div>
                 </div>
-                
+                <div class="mt-2">
+                    <label class="text-xs font-bold text-slate-300 block mb-1">4. Simpan Nilai ke Kategori (Opsional)</label>
+                    <select id="kategoriPenilaian" class="w-full p-2.5 rounded-xl bg-slate-800 text-white border border-slate-700 outline-none focus:border-amber-500 text-xs">
+                        <option value="">-- Tidak Disimpan (Hanya Latihan) --</option>
+                        <option value="Tugas (TP/Bab 1)">Tugas (TP/Bab 1)</option>
+                        <option value="Sumatif (TP/Bab 1)">Sumatif (TP/Bab 1)</option>
+                        <option value="Tugas (TP/Bab 2)">Tugas (TP/Bab 2)</option>
+                        <option value="Sumatif (TP/Bab 2)">Sumatif (TP/Bab 2)</option>
+                        <option value="Tugas (TP/Bab 3)">Tugas (TP/Bab 3)</option>
+                        <option value="Sumatif (TP/Bab 3)">Sumatif (TP/Bab 3)</option>
+                        <option value="Tugas (TP/Bab 4)">Tugas (TP/Bab 4)</option>
+                        <option value="Sumatif (TP/Bab 4)">Sumatif (TP/Bab 4)</option>
+                        <option value="Tugas (TP/Bab 5)">Tugas (TP/Bab 5)</option>
+                        <option value="Sumatif (TP/Bab 5)">Sumatif (TP/Bab 5)</option>
+                        <option value="Tugas (TP/Bab 6)">Tugas (TP/Bab 6)</option>
+                        <option value="Sumatif (TP/Bab 6)">Sumatif (TP/Bab 6)</option>
+                        <option value="Tugas (TP/Bab 7)">Tugas (TP/Bab 7)</option>
+                        <option value="Sumatif (TP/Bab 7)">Sumatif (TP/Bab 7)</option>
+                        <option value="STS">STS</option>
+                        <option value="SAS">SAS</option>
+                    </select>
+                </div>
                 <div class="p-3 bg-slate-800/80 border border-slate-700 rounded-xl flex items-center justify-between">
                     <label for="acak-soal-checkbox" class="text-xs font-bold text-slate-300 cursor-pointer flex items-center select-none">
                         <i class="fa-solid fa-shuffle text-amber-400 mr-2.5"></i> Acak Urutan Soal (Shuffle)
