@@ -555,9 +555,6 @@ function undiPemainDuelSpin() {
 }
 
 function bukaArenaKuis(soalArray, isNewSession = true) {
-    // SUNTIKAN RIWAYAT UNTUK SWIPE BACK:
-    history.pushState({ modal: 'kuis' }, "", "#arena-kuis");
-    
     clearQuizTimeouts();
     if (isNewSession || !AppState.kuis.masterQuizSession) {
         AppState.kuis.masterQuizSession = JSON.parse(JSON.stringify(soalArray));
